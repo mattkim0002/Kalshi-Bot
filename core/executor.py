@@ -172,15 +172,15 @@ class TradeExecutor:
     ) -> OrderResult:
         """Place a market buy order on Polymarket US."""
         try:
-            intent = "BUY_LONG" if direction == "YES" else "BUY_SHORT"
+            intent = "ORDER_INTENT_BUY_LONG" if direction == "YES" else "ORDER_INTENT_BUY_SHORT"
             result = await asyncio.to_thread(
                 self.client.orders.create,
                 {
                     "marketSlug": token_id,
                     "intent": intent,
                     "type": "ORDER_TYPE_MARKET",
-                    "cashOrderQty": f"{amount:.2f}",
-                    "tif": "FOK",
+                    "cashOrderQty": {"value": f"{amount:.2f}", "currency": "USD"},
+                    "tif": "TIME_IN_FORCE_FILL_OR_KILL",
                     "synchronousExecution": True,
                 },
             )
@@ -217,7 +217,7 @@ class TradeExecutor:
     ) -> OrderResult:
         """Close a position on Polymarket US."""
         try:
-            intent = "SELL_LONG" if direction == "YES" else "SELL_SHORT"
+            intent = "ORDER_INTENT_SELL_LONG" if direction == "YES" else "ORDER_INTENT_SELL_SHORT"
             result = await asyncio.to_thread(
                 self.client.orders.close_position,
                 {
