@@ -5,9 +5,11 @@ Handles order placement via the polymarket-us SDK.
 Supports both dry-run (paper trading) and live execution.
 """
 import asyncio
+import json
 import logging
 import time
 from dataclasses import dataclass
+from pathlib import Path
 from typing import Optional
 
 import config
@@ -201,6 +203,7 @@ class TradeExecutor:
 
         except Exception as e:
             logger.error(f"[LIVE] Buy execution error: {e}")
+            self._log_failed_trade("BUY", token_id, amount, direction, question, str(e))
             return OrderResult(
                 success=False,
                 order_id=None,
@@ -243,6 +246,7 @@ class TradeExecutor:
 
         except Exception as e:
             logger.error(f"[LIVE] Sell execution error: {e}")
+            self._log_failed_trade("SELL", token_id, 0, direction, question, str(e))
             return OrderResult(
                 success=False,
                 order_id=None,
@@ -252,3 +256,23 @@ class TradeExecutor:
                 is_simulation=False,
                 error=str(e),
             )
+
+    def _log_failed_trade(self, action, market_slug, amount, direction, question, error):
+        """Append a failed trade attempt to failed_trades.json."""
+        entry = {
+            "timestamp": time.time(),
+            "action": action,
+            "market_slug": market_slug,
+            "amount_usd": amount,
+            "direction": direction,
+            "question": question,
+            "error": error,
+        }
+        path = Path("failed_trades.json")
+        try:
+            existing = json.loads(path.read_text()) if path.exists() else []
+            existing.append(entry)
+            # Keep only last 50 failures
+            path.write_text(json.dumps(existing[-50:], indent=2))
+        except Exception:
+            pass

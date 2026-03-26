@@ -34,6 +34,7 @@ def pnl_color(val):
 def build_html():
     positions = load_json("positions.json", {})
     trades = load_json("trades.json", [])
+    failed = load_json("failed_trades.json", [])
 
     total_exposure = sum(p.get("cost_basis", 0) for p in positions.values())
     total_pnl = sum(p.get("unrealized_pnl", 0) for p in positions.values())
@@ -96,6 +97,28 @@ def build_html():
         </div>"""
     if not trades_html:
         trades_html = '<div class="empty">No trades yet.</div>'
+
+    # Build failed trades HTML (last 10, newest first)
+    recent_failed = sorted(failed, key=lambda x: x.get("timestamp", 0), reverse=True)[:10]
+    failed_html = ""
+    for f in recent_failed:
+        ts = f.get("timestamp", 0)
+        err = f.get("error", "Unknown error")
+        if "unexpected token" in err:
+            err = "Order format error: " + err.split("unexpected token")[-1].strip()
+        elif len(err) > 80:
+            err = err[:80] + "..."
+        failed_html += f"""
+        <div class="trade-row">
+            <span class="trade-badge" style="background:#b71c1c">{f.get('action','?')}</span>
+            <span class="trade-q">{f.get('question','')[:45]}</span>
+            <span class="trade-dir" style="color:#ff5252">{f.get('direction','')}</span>
+            <span class="trade-amt" style="color:#ff5252">${f.get('amount_usd',0):.2f}</span>
+            <span class="trade-time">{time_ago(ts)}</span>
+        </div>
+        <div style="font-size:11px;color:#b71c1c;padding:0 0 8px 0;border-bottom:1px solid #1f1f1f">{err}</div>"""
+    if not failed_html:
+        failed_html = '<div class="empty">No failed trades.</div>'
 
     total_color = pnl_color(total_pnl)
     daily_color = pnl_color(daily_pnl)
@@ -183,6 +206,13 @@ def build_html():
   <h2>Recent Trades</h2>
   <div class="card">
     {trades_html}
+  </div>
+</div>
+
+<div class="section">
+  <h2>Failed Orders</h2>
+  <div class="card">
+    {failed_html}
   </div>
 </div>
 
