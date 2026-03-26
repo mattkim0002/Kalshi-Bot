@@ -110,8 +110,16 @@ class MarketScanner:
                 if not items:
                     break
 
+                # Log first item structure once for debugging
+                if offset == 0 and items:
+                    first = items[0]
+                    sample = first if isinstance(first, dict) else vars(first)
+                    logger.debug(f"Market response sample keys: {list(sample.keys())}")
+                    logger.debug(f"Market response sample: {sample}")
+
                 for m in items:
-                    market = self._parse_market(m if isinstance(m, dict) else m.__dict__)
+                    data = m if isinstance(m, dict) else vars(m)
+                    market = self._parse_market(data)
                     if market is None:
                         continue
                     if market.volume < min_volume:
@@ -178,7 +186,7 @@ class MarketScanner:
             return None
         try:
             raw = await asyncio.to_thread(self._client.markets.retrieve_by_slug, slug)
-            data = raw if isinstance(raw, dict) else raw.__dict__
+            data = raw if isinstance(raw, dict) else vars(raw)
             return self._parse_market(data)
         except Exception as e:
             logger.error(f"Error fetching market {slug}: {e}")
