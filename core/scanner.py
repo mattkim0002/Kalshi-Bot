@@ -147,8 +147,8 @@ class MarketScanner:
 
             yes_price = float(prices[0])
 
-            # Skip unpriced or fully resolved markets
-            if yes_price <= 0 or yes_price >= 1:
+            # Skip unpriced, resolved, or near-resolved markets
+            if yes_price <= 0.02 or yes_price >= 0.98:
                 return None
 
             return Market(

@@ -47,6 +47,8 @@ CLAUDE_MODEL = "claude-sonnet-4-6"
 WEB_SEARCH_MAX = 3              # Max web searches per market analysis
 MIN_CONFIDENCE = "Medium"       # Minimum confidence to consider: Low, Medium, High
 CONFIDENCE_MAP = {"Low": 1, "Medium": 2, "High": 3}
+ESTIMATOR_BATCH_SIZE = 5        # Markets to analyze per cycle (keep low to avoid rate limits)
+ESTIMATOR_STAGGER_SECS = 8      # Seconds between Claude calls
 
 # ─────────────────────────────────────────────
 # EXIT STRATEGY

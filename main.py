@@ -118,10 +118,10 @@ class TradingSystem:
         new_markets = [m for m in markets if m.condition_id not in open_ids]
         
         # ── Step 3: Estimate probabilities ───────────────────
-        # Only estimate a batch at a time to manage API costs
-        batch_size = min(20, len(new_markets))
+        # Only estimate a batch at a time to manage API costs/rate limits
+        batch_size = min(config.ESTIMATOR_BATCH_SIZE, len(new_markets))
         batch = new_markets[:batch_size]
-        
+
         logger.info(f"Step 3: Estimating probabilities for top {batch_size} markets...")
         estimated = await self.estimator.estimate_batch(batch)
         

@@ -138,7 +138,7 @@ class ProbabilityEstimator:
         results = []
         for i, market in enumerate(markets):
             if i > 0:
-                await asyncio.sleep(2)  # 2s stagger to stay under token/min limit
+                await asyncio.sleep(config.ESTIMATOR_STAGGER_SECS)
             result = await self.estimate(market)
             results.append(result)
 
