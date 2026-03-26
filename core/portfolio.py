@@ -3,7 +3,9 @@ Portfolio Manager.
 
 Tracks open positions, P&L, exposure, and enforces risk limits.
 Persists state to disk for crash recovery.
+Syncs bankroll from live Polymarket US account balance.
 """
+import asyncio
 import json
 import time
 import logging
@@ -72,7 +74,25 @@ class PortfolioManager:
         self.trade_history: list[TradeRecord] = []
         self.daily_pnl: float = 0.0
         self.daily_pnl_reset_time: float = time.time()
+        self.bankroll: float = config.BANKROLL  # updated from live API
         self._load_state()
+
+    async def sync_balance(self, client) -> float:
+        """
+        Fetch live buying power from Polymarket US and update bankroll.
+        Falls back to config.BANKROLL if unavailable (dry run / error).
+        """
+        if config.DRY_RUN or client is None:
+            return self.bankroll
+        try:
+            data = await asyncio.to_thread(client.account.balances)
+            balance = data.get("buyingPower") if isinstance(data, dict) else getattr(data, "buyingPower", None)
+            if balance is not None:
+                self.bankroll = float(balance)
+                logger.info(f"Account balance synced: ${self.bankroll:.2f} buying power")
+        except Exception as e:
+            logger.warning(f"Could not sync balance from API: {e}. Using ${self.bankroll:.2f}")
+        return self.bankroll
 
     # ── Position Management ──────────────────────────
 
@@ -194,7 +214,7 @@ class PortfolioManager:
         # Check total exposure
         current_exposure = self.total_exposure
         new_exposure = current_exposure + amount_usd
-        max_exposure_usd = config.BANKROLL * config.MAX_TOTAL_EXPOSURE
+        max_exposure_usd = self.bankroll * config.MAX_TOTAL_EXPOSURE
         
         if new_exposure > max_exposure_usd:
             return False, (
@@ -222,7 +242,7 @@ class PortfolioManager:
     @property
     def available_capital(self) -> float:
         """How much capital is available to deploy."""
-        return config.BANKROLL - self.total_exposure
+        return self.bankroll - self.total_exposure
 
     def _maybe_reset_daily_pnl(self):
         """Reset daily P&L counter if a new day has started."""

@@ -62,15 +62,21 @@ class TradingSystem:
 
     async def run(self, once: bool = False):
         """Main trading loop."""
-        self._print_banner()
         self._validate_config()
 
         try:
+            # Sync live balance before printing banner so it shows real balance
+            await self.portfolio.sync_balance(self.scanner._client)
+            self._print_banner()
+
             while self._running:
                 self._cycle_count += 1
                 logger.info(f"\n{'='*60}\nCYCLE {self._cycle_count} STARTING\n{'='*60}")
-                
+
                 await self._run_cycle()
+
+                # Re-sync balance after each cycle to pick up deposits/withdrawals
+                await self.portfolio.sync_balance(self.scanner._client)
                 
                 self.portfolio.print_summary()
                 
@@ -252,7 +258,7 @@ class TradingSystem:
 ║           POLYMARKET AI TRADING SYSTEM                      ║
 ║                                                              ║
 ║  Mode:           {mode:<40} ║
-║  Bankroll:       ${config.BANKROLL:>10,.2f}                              ║
+║  Bankroll:       ${self.portfolio.bankroll:>10,.2f}                              ║
 ║  Kelly fraction: {config.KELLY_FRACTION:.0%} ({"Quarter" if config.KELLY_FRACTION == 0.25 else "Half" if config.KELLY_FRACTION == 0.5 else "Custom"}-Kelly){' ' * 28}║
 ║  Min edge:       {config.MIN_EDGE:.0%}{' ' * 42}║
 ║  Max position:   {config.MAX_POSITION_PCT:.0%} of bankroll{' ' * 30}║
