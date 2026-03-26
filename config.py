@@ -43,7 +43,7 @@ MAX_MARKETS_TO_SCAN = 500       # Fetch up to 500 active markets per scan
 # ─────────────────────────────────────────────
 # CLAUDE AI ESTIMATOR
 # ─────────────────────────────────────────────
-CLAUDE_MODEL = "claude-opus-4-6"
+CLAUDE_MODEL = "claude-sonnet-4-6"
 WEB_SEARCH_MAX = 3              # Max web searches per market analysis
 MIN_CONFIDENCE = "Medium"       # Minimum confidence to consider: Low, Medium, High
 CONFIDENCE_MAP = {"Low": 1, "Medium": 2, "High": 3}
