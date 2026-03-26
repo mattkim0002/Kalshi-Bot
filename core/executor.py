@@ -171,13 +171,15 @@ class TradeExecutor:
         """Place a market buy order on Polymarket US."""
         try:
             intent = "BUY_LONG" if direction == "YES" else "BUY_SHORT"
+            # cashOrderQty must be an integer (cents), e.g. $6.00 → 600
+            cash_qty_cents = int(round(amount * 100))
             result = await asyncio.to_thread(
                 self.client.orders.create,
                 {
                     "marketSlug": token_id,
                     "intent": intent,
                     "type": "ORDER_TYPE_MARKET",
-                    "cashOrderQty": amount,
+                    "cashOrderQty": cash_qty_cents,
                     "tif": "FOK",
                     "synchronousExecution": True,
                 },
