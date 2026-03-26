@@ -86,10 +86,16 @@ class PortfolioManager:
             return self.bankroll
         try:
             data = await asyncio.to_thread(client.account.balances)
-            balance = data.get("buyingPower") if isinstance(data, dict) else getattr(data, "buyingPower", None)
+            logger.info(f"Balance API response: {data}")
+            if isinstance(data, dict):
+                balance = data.get("buyingPower") or data.get("buying_power") or data.get("cash") or data.get("balance") or data.get("availableBalance")
+            else:
+                balance = getattr(data, "buyingPower", None) or getattr(data, "buying_power", None) or getattr(data, "cash", None)
             if balance is not None:
                 self.bankroll = float(balance)
-                logger.info(f"Account balance synced: ${self.bankroll:.2f} buying power")
+                logger.info(f"Account balance synced: ${self.bankroll:.2f}")
+            else:
+                logger.warning(f"Could not find balance field in response: {data}")
         except Exception as e:
             logger.warning(f"Could not sync balance from API: {e}. Using ${self.bankroll:.2f}")
         return self.bankroll
