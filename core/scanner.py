@@ -5,6 +5,7 @@ Fetches active markets via the polymarket-us SDK,
 filters by volume/liquidity, and ranks by estimated edge.
 """
 import asyncio
+import json
 import logging
 from dataclasses import dataclass
 from typing import Optional
@@ -96,11 +97,9 @@ class MarketScanner:
             try:
                 params = {
                     "active": True,
+                    "closed": False,
                     "limit": batch_size,
                     "offset": offset,
-                    "orderBy": ["volume"],
-                    "orderDirection": "desc",
-                    "volumeNumMin": min_volume,
                 }
 
                 raw = await asyncio.to_thread(self._client.markets.list, params)
@@ -110,21 +109,10 @@ class MarketScanner:
                 if not items:
                     break
 
-                # Log first item structure once for debugging
-                if offset == 0 and items:
-                    first = items[0]
-                    sample = first if isinstance(first, dict) else vars(first)
-                    logger.debug(f"Market response sample keys: {list(sample.keys())}")
-                    logger.debug(f"Market response sample: {sample}")
-
                 for m in items:
                     data = m if isinstance(m, dict) else vars(m)
                     market = self._parse_market(data)
                     if market is None:
-                        continue
-                    if market.volume < min_volume:
-                        continue
-                    if market.liquidity < min_liquidity:
                         continue
                     markets.append(market)
 
@@ -146,18 +134,20 @@ class MarketScanner:
             if not slug:
                 return None
 
-            # Use lastTradePrice as implied probability; fall back to mid price
-            last_trade = data.get("lastTradePrice") or data.get("lastTradePx")
-            best_bid = float(data.get("bestBid") or 0)
-            best_ask = float(data.get("bestAsk") or 1)
-
-            if last_trade is not None:
-                yes_price = float(last_trade)
-            elif best_bid > 0 and best_ask < 1:
-                yes_price = (best_bid + best_ask) / 2
-            else:
+            # Skip closed/resolved markets
+            if data.get("closed", False):
                 return None
 
+            # outcomePrices is a JSON string e.g. '["0.62","0.38"]'
+            raw_prices = data.get("outcomePrices", "[]")
+            prices = json.loads(raw_prices) if isinstance(raw_prices, str) else raw_prices
+
+            if len(prices) < 2:
+                return None
+
+            yes_price = float(prices[0])
+
+            # Skip unpriced or fully resolved markets
             if yes_price <= 0 or yes_price >= 1:
                 return None
 
@@ -166,17 +156,17 @@ class MarketScanner:
                 question=data.get("question", ""),
                 slug=slug,
                 yes_price=yes_price,
-                no_price=1 - yes_price,
+                no_price=float(prices[1]),
                 yes_token_id=slug,   # slug used for order placement
                 no_token_id=slug,    # slug used for order placement
-                volume=float(data.get("volume") or 0),
-                liquidity=float(data.get("liquidity") or 0),
-                end_date=data.get("endDate") or data.get("end_date"),
+                volume=0,            # not provided by this endpoint
+                liquidity=0,
+                end_date=data.get("endDate"),
                 category=data.get("category", ""),
                 description=data.get("description", ""),
                 url=f"https://polymarket.us/event/{slug}",
             )
-        except (ValueError, KeyError, TypeError) as e:
+        except (ValueError, KeyError, TypeError, json.JSONDecodeError) as e:
             logger.debug(f"Skipping malformed market: {e}")
             return None
 
