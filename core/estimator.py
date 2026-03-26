@@ -131,19 +131,23 @@ class ProbabilityEstimator:
         max_concurrent: int = 5,
     ) -> list[Market]:
         """
-        Estimate probabilities for multiple markets concurrently.
+        Estimate probabilities for multiple markets, staggered to avoid rate limits.
         """
         logger.info(f"Estimating probabilities for {len(markets)} markets...")
-        
-        tasks = [self.estimate(m) for m in markets]
-        results = await asyncio.gather(*tasks, return_exceptions=True)
-        
+
+        results = []
+        for i, market in enumerate(markets):
+            if i > 0:
+                await asyncio.sleep(2)  # 2s stagger to stay under token/min limit
+            result = await self.estimate(market)
+            results.append(result)
+
         successful = [
             r for r in results
             if isinstance(r, Market) and r.estimated_prob is not None
         ]
         logger.info(f"Successfully estimated {len(successful)}/{len(markets)} markets")
-        
+
         return [r for r in results if isinstance(r, Market)]
 
     async def _call_claude(self, market: Market) -> Optional[dict]:
@@ -178,27 +182,32 @@ class ProbabilityEstimator:
             "content-type": "application/json",
         }
 
-        try:
-            async with self.session.post(
-                "https://api.anthropic.com/v1/messages",
-                json=payload,
-                headers=headers,
-                timeout=aiohttp.ClientTimeout(total=60),
-            ) as resp:
-                if resp.status != 200:
-                    error = await resp.text()
-                    logger.error(f"Claude API error {resp.status}: {error[:200]}")
-                    return None
-                
-                data = await resp.json()
-                return self._parse_response(data)
-
-        except asyncio.TimeoutError:
-            logger.warning(f"Claude API timeout for: {market.question[:60]}...")
-            return None
-        except Exception as e:
-            logger.error(f"Claude API call failed: {e}")
-            return None
+        for attempt in range(3):
+            try:
+                async with self.session.post(
+                    "https://api.anthropic.com/v1/messages",
+                    json=payload,
+                    headers=headers,
+                    timeout=aiohttp.ClientTimeout(total=60),
+                ) as resp:
+                    if resp.status == 429:
+                        wait = 15 * (attempt + 1)
+                        logger.warning(f"Rate limited. Waiting {wait}s before retry...")
+                        await asyncio.sleep(wait)
+                        continue
+                    if resp.status != 200:
+                        error = await resp.text()
+                        logger.error(f"Claude API error {resp.status}: {error[:200]}")
+                        return None
+                    data = await resp.json()
+                    return self._parse_response(data)
+            except asyncio.TimeoutError:
+                logger.warning(f"Claude API timeout for: {market.question[:60]}...")
+                return None
+            except Exception as e:
+                logger.error(f"Claude API call failed: {e}")
+                return None
+        return None
 
     def _build_prompt(self, market: Market) -> str:
         """Build the analysis prompt for Claude."""
