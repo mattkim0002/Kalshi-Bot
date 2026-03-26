@@ -18,18 +18,18 @@ ANTHROPIC_API_KEY = os.getenv("ANTHROPIC_API_KEY", "")
 # ─────────────────────────────────────────────
 # TRADING MODE
 # ─────────────────────────────────────────────
-DRY_RUN = True  # True = paper trading, False = live with real USDC. START WITH TRUE.
+DRY_RUN = False  # True = paper trading, False = live with real USDC.
 
 # ─────────────────────────────────────────────
 # RISK MANAGEMENT
 # ─────────────────────────────────────────────
-BANKROLL = 1000.0           # Total capital allocated (in USDC)
+BANKROLL = 30.0             # Total capital allocated (in USDC)
 KELLY_FRACTION = 0.25       # Quarter-Kelly (0.25 recommended, max 0.5)
 MIN_EDGE = 0.05             # Minimum edge to trade (5%). Below this, skip.
-MAX_POSITION_PCT = 0.06     # Max 6% of bankroll on any single market
-MAX_DAILY_LOSS = 50.0       # Stop trading if daily losses exceed this
+MAX_POSITION_PCT = 0.10     # Max 10% of bankroll per market (~$3 max)
+MAX_DAILY_LOSS = 10.0       # Stop trading if daily losses exceed $10
 MAX_TOTAL_EXPOSURE = 0.50   # Max 50% of bankroll deployed at any time
-MAX_POSITIONS = 15          # Max simultaneous open positions
+MAX_POSITIONS = 5           # Max simultaneous open positions
 IMPACT_THRESHOLD = 0.50     # Warn if slippage eats >50% of edge
 
 # ─────────────────────────────────────────────
