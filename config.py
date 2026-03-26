@@ -10,12 +10,10 @@ load_dotenv()
 # ─────────────────────────────────────────────
 # API CREDENTIALS
 # ─────────────────────────────────────────────
-POLYMARKET_PRIVATE_KEY = os.getenv("POLYMARKET_PRIVATE_KEY", "")
-POLYMARKET_FUNDER_ADDRESS = os.getenv("POLYMARKET_FUNDER_ADDRESS", "")
+# Polymarket US credentials — get from polymarket.us/developer
+POLYMARKET_KEY_ID = os.getenv("POLYMARKET_KEY_ID", "")
+POLYMARKET_SECRET_KEY = os.getenv("POLYMARKET_SECRET_KEY", "")
 ANTHROPIC_API_KEY = os.getenv("ANTHROPIC_API_KEY", "")
-
-# Polymarket account type: 0 = EOA (MetaMask), 1 = Email (Magic.Link), 2 = Browser proxy
-SIGNATURE_TYPE = int(os.getenv("SIGNATURE_TYPE", "1"))
 
 # ─────────────────────────────────────────────
 # TRADING MODE
@@ -67,8 +65,7 @@ POSITIONS_FILE = "positions.json"
 PNL_FILE = "pnl.json"
 
 # ─────────────────────────────────────────────
-# POLYMARKET API
+# POLYMARKET US API
 # ─────────────────────────────────────────────
-GAMMA_API_BASE = "https://gamma-api.polymarket.com"
-CLOB_API_BASE = "https://clob.polymarket.com"
-CHAIN_ID = 137  # Polygon
+POLYMARKET_API_BASE = "https://api.polymarket.us/v1"
+POLYMARKET_GATEWAY_BASE = "https://gateway.polymarket.us/v1"
