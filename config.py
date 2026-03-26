@@ -26,10 +26,11 @@ DRY_RUN = False  # True = paper trading, False = live with real USDC.
 BANKROLL = 30.0             # Total capital allocated (in USDC)
 KELLY_FRACTION = 0.25       # Quarter-Kelly (0.25 recommended, max 0.5)
 MIN_EDGE = 0.03             # Minimum edge to trade (3%). Below this, skip.
-MAX_POSITION_PCT = 0.20     # Max 20% of bankroll per market (~$6 max)
+MAX_POSITION_PCT = 0.15     # Max 15% of bankroll per market
 MAX_DAILY_LOSS = 10.0       # Stop trading if daily losses exceed $10
 MAX_TOTAL_EXPOSURE = 0.50   # Max 50% of bankroll deployed at any time
-MAX_POSITIONS = 5           # Max simultaneous open positions
+MAX_POSITIONS = 8           # Max simultaneous open positions
+MAX_POSITIONS_PER_MARKET = 1  # Max 1 position per unique market question
 IMPACT_THRESHOLD = 0.50     # Warn if slippage eats >50% of edge
 
 # ─────────────────────────────────────────────
@@ -47,7 +48,7 @@ CLAUDE_MODEL = "claude-sonnet-4-6"
 WEB_SEARCH_MAX = 3              # Max web searches per market analysis
 MIN_CONFIDENCE = "Medium"       # Minimum confidence to consider: Low, Medium, High
 CONFIDENCE_MAP = {"Low": 1, "Medium": 2, "High": 3}
-ESTIMATOR_BATCH_SIZE = 5        # Markets to analyze per cycle (keep low to avoid rate limits)
+ESTIMATOR_BATCH_SIZE = 10       # Markets to analyze per cycle
 ESTIMATOR_STAGGER_SECS = 8      # Seconds between Claude calls
 
 # ─────────────────────────────────────────────

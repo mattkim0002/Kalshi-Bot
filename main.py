@@ -115,7 +115,12 @@ class TradingSystem:
         
         # Filter out markets we already have positions in
         open_ids = set(self.portfolio.positions.keys())
-        new_markets = [m for m in markets if m.condition_id not in open_ids]
+        # Also filter out questions we already hold (1 position per market question)
+        open_questions = {p.question for p in self.portfolio.positions.values()}
+        new_markets = [
+            m for m in markets
+            if m.condition_id not in open_ids and m.question not in open_questions
+        ]
         
         # ── Step 3: Estimate probabilities ───────────────────
         # Only estimate a batch at a time to manage API costs/rate limits
