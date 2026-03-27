@@ -80,8 +80,10 @@ class MarketScanner:
         cursor = None
         retries = 0
         max_retries = 4
+        pages_fetched = 0
+        max_pages = 3  # Never fetch more than 3 pages (600 raw markets max)
 
-        while len(markets) < limit:
+        while pages_fetched < max_pages:
             try:
                 params = {
                     "status": "open",
@@ -110,6 +112,7 @@ class MarketScanner:
                     retries = 0  # reset on success
                     data = await resp.json()
 
+                pages_fetched += 1
                 items = data.get("markets", [])
                 cursor = data.get("cursor")
 
