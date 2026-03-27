@@ -176,17 +176,6 @@ class MarketScanner:
                 self._debug_counts["near_resolved"] = self._debug_counts.get("near_resolved", 0) + 1
                 return None
 
-            # Skip markets expiring too far in the future
-            expiry_str = data.get("expiration_time", "") or ""
-            if expiry_str:
-                try:
-                    expiry = datetime.fromisoformat(expiry_str.replace("Z", "+00:00"))
-                    days_left = (expiry - datetime.now(timezone.utc)).days
-                    if days_left > config.MAX_DAYS_TO_EXPIRY:
-                        self._debug_counts["too_far"] = self._debug_counts.get("too_far", 0) + 1
-                        return None
-                except Exception:
-                    pass
 
             no_price = 1 - yes_price
 
