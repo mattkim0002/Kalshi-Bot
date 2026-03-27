@@ -64,7 +64,7 @@ EXCLUDED_KEYWORDS = [
 # ─────────────────────────────────────────────
 # CLAUDE AI ESTIMATOR
 # ─────────────────────────────────────────────
-CLAUDE_MODEL = "claude-haiku-4-5-20251001"  # Fastest model — ~3x quicker than Sonnet
+CLAUDE_MODEL = "claude-sonnet-4-6"
 WEB_SEARCH_MAX = 1              # 1 web search per market (fast + news-aware)
 MIN_CONFIDENCE = "Medium"       # Minimum confidence: Low, Medium, High
 CONFIDENCE_MAP = {"Low": 1, "Medium": 2, "High": 3}
