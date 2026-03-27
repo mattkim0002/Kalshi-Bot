@@ -45,13 +45,14 @@ class MarketScanner:
     Scans Kalshi for active markets using their REST API.
 
     Flow:
-    1. Fetch active markets from Kalshi API
+    1. Fetch active markets from Kalshi API (authenticated)
     2. Filter by minimum volume and open interest
     3. Return sorted by volume (most liquid first)
     """
 
-    def __init__(self):
+    def __init__(self, sign_request=None):
         self._session: Optional[aiohttp.ClientSession] = None
+        self._sign_request = sign_request  # executor's signing method
 
     async def _ensure_session(self):
         if self._session is None or self._session.closed:
@@ -93,9 +94,12 @@ class MarketScanner:
                 if cursor:
                     params["cursor"] = cursor
 
+                path = "/trade-api/v2/markets"
+                headers = self._sign_request("GET", path) if self._sign_request else {}
                 async with self._session.get(
                     f"{config.KALSHI_API_BASE}/markets",
                     params=params,
+                    headers=headers,
                     timeout=aiohttp.ClientTimeout(total=30),
                 ) as resp:
                     if resp.status == 429:

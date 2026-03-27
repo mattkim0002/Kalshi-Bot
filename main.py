@@ -51,10 +51,11 @@ class TradingSystem:
             config.DRY_RUN = dry_run
         
         self.lmsr = LMSREngine()
-        self.scanner = MarketScanner()
+        self.executor = TradeExecutor()
+        # Pass executor's signing method so scanner makes authenticated requests
+        self.scanner = MarketScanner(sign_request=self.executor._sign_request if not self.executor.dry_run else None)
         self.estimator = ProbabilityEstimator()
         self.portfolio = PortfolioManager()
-        self.executor = TradeExecutor()
         self.exit_manager = ExitManager(self.portfolio, self.estimator)
         
         self._running = True
