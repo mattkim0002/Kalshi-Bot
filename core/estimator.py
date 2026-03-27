@@ -8,6 +8,7 @@ import asyncio
 import aiohttp
 import json
 import logging
+import time
 from typing import Optional
 
 import config
@@ -71,6 +72,54 @@ CRITICAL RULES:
 7. Be concise — short reasoning only.
 
 You MUST call the submit_prediction tool with your analysis."""
+
+
+class BtcContext:
+    """Fetches live Bitcoin price and trend from CoinGecko (no API key needed)."""
+
+    COINGECKO_URL = "https://api.coingecko.com/api/v3/coins/bitcoin/market_chart"
+    _cache: dict = {}
+    _cache_ttl = 300  # refresh every 5 minutes
+
+    @classmethod
+    async def get(cls, session: aiohttp.ClientSession) -> str:
+        """Return a short BTC market context string for Claude's prompt."""
+        now = time.time()
+        if cls._cache and now - cls._cache.get("ts", 0) < cls._cache_ttl:
+            return cls._cache["text"]
+
+        try:
+            params = {"vs_currency": "usd", "days": "7", "interval": "daily"}
+            async with session.get(
+                cls.COINGECKO_URL,
+                params=params,
+                timeout=aiohttp.ClientTimeout(total=10),
+            ) as resp:
+                if resp.status != 200:
+                    return ""
+                data = await resp.json()
+
+            prices = [p[1] for p in data.get("prices", [])]
+            if len(prices) < 2:
+                return ""
+
+            current = prices[-1]
+            week_ago = prices[0]
+            pct_7d = (current - week_ago) / week_ago * 100
+            direction = "up" if pct_7d > 2 else "down" if pct_7d < -2 else "flat"
+
+            text = (
+                f"MACRO CONTEXT — Bitcoin is currently ${current:,.0f} "
+                f"({pct_7d:+.1f}% over 7 days, trending {direction}). "
+                f"Factor this into your analysis where relevant."
+            )
+            cls._cache = {"ts": now, "text": text}
+            logger.info(f"BTC context: {text}")
+            return text
+
+        except Exception as e:
+            logger.warning(f"Could not fetch BTC context: {e}")
+            return ""
 
 
 class ProbabilityEstimator:
@@ -153,7 +202,8 @@ class ProbabilityEstimator:
         """
         await self._ensure_session()
 
-        user_message = self._build_prompt(market)
+        btc_context = await BtcContext.get(self.session)
+        user_message = self._build_prompt(market, btc_context)
 
         # Build tools list
         tools = [ANALYSIS_TOOL]
@@ -205,7 +255,7 @@ class ProbabilityEstimator:
                 return None
         return None
 
-    def _build_prompt(self, market: Market) -> str:
+    def _build_prompt(self, market: Market, btc_context: str = "") -> str:
         """Build the analysis prompt for Claude."""
         parts = [
             f"Analyze this prediction market question and estimate the TRUE probability.\n",
@@ -221,6 +271,7 @@ class ProbabilityEstimator:
             f"MARKET VOLUME: ${market.volume:,.0f}",
             f"CATEGORY: {market.category}" if market.category else "",
             f"END DATE: {market.end_date}" if market.end_date else "",
+            btc_context if btc_context else "",
             "",
             "Search for the latest news on this topic, then call submit_prediction "
             "with your probability estimate, confidence level, and brief reasoning.",
