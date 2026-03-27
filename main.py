@@ -197,7 +197,15 @@ class TradingSystem:
                 f"SKIP: {market.question[:50]}... — {analysis.skip_reason}"
             )
             return
-        
+
+        # Minimum position size guard (Kalshi has ~$1 minimum and tiny bets waste fees)
+        if analysis.position_size_usd < config.MIN_POSITION_USD:
+            logger.info(
+                f"SKIP: {market.question[:50]}... — "
+                f"Position ${analysis.position_size_usd:.2f} below minimum ${config.MIN_POSITION_USD:.2f}"
+            )
+            return
+
         # Risk check
         can_trade, reason = self.portfolio.can_open_position(analysis.position_size_usd)
         if not can_trade:

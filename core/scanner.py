@@ -156,6 +156,14 @@ class MarketScanner:
 
             title = data.get("title", "") or data.get("subtitle", "") or ticker
             event_ticker = data.get("event_ticker", "")
+            category = data.get("category", "") or ""
+
+            # ── Sports filter ────────────────────────────────────
+            if category.lower().strip() in config.EXCLUDED_CATEGORIES:
+                return None
+            title_lower = title.lower()
+            if any(kw in title_lower for kw in config.EXCLUDED_KEYWORDS):
+                return None
 
             return Market(
                 condition_id=ticker,
@@ -168,7 +176,7 @@ class MarketScanner:
                 volume=volume,
                 liquidity=liquidity,
                 end_date=data.get("expiration_time", ""),
-                category=data.get("category", ""),
+                category=category,
                 description=data.get("subtitle", ""),
                 url=f"https://kalshi.com/markets/{event_ticker}/{ticker}",
             )

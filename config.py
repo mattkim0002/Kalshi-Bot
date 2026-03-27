@@ -24,13 +24,14 @@ DRY_RUN = False  # True = paper trading, False = live with real money.
 # ─────────────────────────────────────────────
 # RISK MANAGEMENT
 # ─────────────────────────────────────────────
-BANKROLL = 40.0             # Starting capital (updated live from API)
+BANKROLL = 10.0             # Starting capital (updated live from API)
 KELLY_FRACTION = 0.25       # Quarter-Kelly (0.25 recommended, max 0.5)
-MIN_EDGE = 0.03             # Minimum edge to trade (3%)
-MAX_POSITION_PCT = 0.15     # Max 15% of bankroll per market
-MAX_DAILY_LOSS = 10.0       # Stop trading if daily losses exceed $10
-MAX_TOTAL_EXPOSURE = 0.50   # Max 50% of bankroll deployed at any time
-MAX_POSITIONS = 8           # Max simultaneous open positions
+MIN_EDGE = 0.06             # Minimum edge to trade (6% — higher bar for small account)
+MAX_POSITION_PCT = 0.15     # Max 15% of bankroll per market (~$1.50 on $10)
+MIN_POSITION_USD = 1.00     # Never place an order smaller than $1 (below Kalshi minimums)
+MAX_DAILY_LOSS = 2.00       # Stop trading if daily losses exceed $2 (20% of bankroll)
+MAX_TOTAL_EXPOSURE = 0.40   # Max 40% of bankroll deployed at any time ($4 max out)
+MAX_POSITIONS = 4           # Max 4 simultaneous positions on a $10 account
 MAX_POSITIONS_PER_MARKET = 1  # Max 1 position per unique market question
 IMPACT_THRESHOLD = 0.50     # Warn if slippage eats >50% of edge
 
@@ -41,6 +42,24 @@ SCAN_INTERVAL_SECONDS = 600     # Scan markets every 10 minutes
 MIN_VOLUME = 1000               # Only consider markets with >$1K 24h volume
 MIN_LIQUIDITY = 500             # Only consider markets with >$500 open interest
 MAX_MARKETS_TO_SCAN = 500       # Fetch up to 500 active markets per scan
+
+# ─────────────────────────────────────────────
+# MARKET FILTERS
+# ─────────────────────────────────────────────
+# Categories and keywords to exclude (sports = unpredictable, gambling-like)
+EXCLUDED_CATEGORIES = {
+    "sports", "sport", "basketball", "football", "soccer", "baseball",
+    "hockey", "tennis", "golf", "mma", "ufc", "boxing", "nfl", "nba",
+    "mlb", "nhl", "fifa", "olympics", "racing", "esports", "cricket",
+}
+EXCLUDED_KEYWORDS = [
+    "nfl", "nba", "mlb", "nhl", "ufc", "mma", "super bowl", "world series",
+    "stanley cup", "championship game", "playoffs", "march madness",
+    "world cup", "premier league", "champions league", "formula 1", "f1",
+    "grand prix", "wimbledon", "us open tennis", "masters golf",
+    "who will win the game", "cover the spread", "total points",
+    "rushing yards", "passing yards", "home run", "touchdowns",
+]
 
 # ─────────────────────────────────────────────
 # CLAUDE AI ESTIMATOR
@@ -56,7 +75,7 @@ ESTIMATOR_STAGGER_SECS = 8      # Seconds between Claude calls
 # EXIT STRATEGY
 # ─────────────────────────────────────────────
 TAKE_PROFIT_EDGE = 0.02        # Exit if remaining edge drops below 2%
-STOP_LOSS_PCT = 0.30           # Exit if position loses 30% of entry value
+STOP_LOSS_PCT = 0.20           # Exit if position loses 20% of entry value (tighter on small account)
 TIME_EXIT_HOURS = 48           # Re-evaluate all positions every 48 hours
 REEVAL_INTERVAL_SECONDS = 3600 # Re-evaluate positions every hour
 
