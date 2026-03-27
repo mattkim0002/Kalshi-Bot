@@ -143,13 +143,18 @@ class MarketScanner:
 
         # Sort by volume descending
         markets.sort(key=lambda m: m.volume, reverse=True)
-        logger.info(f"Fetched {len(markets)} markets meeting criteria")
+        logger.info(f"Fetched {len(markets)} markets meeting criteria. Rejections: {self._debug_counts}")
+        self._debug_counts = {}
         return markets[:limit]
+
+    # Track filter rejection reasons across all markets in a scan
+    _debug_counts: dict = {}
 
     def _parse_market(self, data: dict, min_volume: float, min_liquidity: float) -> Optional[Market]:
         """Parse a Kalshi market entry."""
         try:
             if data.get("status") != "active":
+                self._debug_counts["not_active"] = self._debug_counts.get("not_active", 0) + 1
                 return None
 
             ticker = data.get("ticker", "")
@@ -167,10 +172,12 @@ class MarketScanner:
             elif last_price > 0:
                 yes_price = last_price
             else:
+                self._debug_counts["no_price"] = self._debug_counts.get("no_price", 0) + 1
                 return None
 
             # Skip near-resolved markets
             if yes_price <= 0.03 or yes_price >= 0.97:
+                self._debug_counts["near_resolved"] = self._debug_counts.get("near_resolved", 0) + 1
                 return None
 
             no_price = 1 - yes_price
@@ -180,6 +187,7 @@ class MarketScanner:
             liquidity = float(data.get("open_interest_fp", 0) or 0)
 
             if volume < min_volume or liquidity < min_liquidity:
+                self._debug_counts["low_volume"] = self._debug_counts.get("low_volume", 0) + 1
                 return None
 
             title = data.get("title", "") or data.get("subtitle", "") or ticker
@@ -188,15 +196,18 @@ class MarketScanner:
 
             # ── Sports filter ────────────────────────────────────
             if category.lower().strip() in config.EXCLUDED_CATEGORIES:
+                self._debug_counts["sports_category"] = self._debug_counts.get("sports_category", 0) + 1
                 return None
             title_lower = title.lower()
             ticker_lower = ticker.lower()
             if any(kw in title_lower or kw in ticker_lower for kw in config.EXCLUDED_KEYWORDS):
+                self._debug_counts["sports_keyword"] = self._debug_counts.get("sports_keyword", 0) + 1
                 return None
             # Kalshi Exchange (KX prefix) is almost entirely sports.
             # Whitelist only KX crypto/finance tickers we want; block all other KX.
             KX_ALLOWED = ("kxbtc", "kxeth", "kxsol", "kxspy", "kxqqq", "kxgold", "kxoil")
             if ticker_lower.startswith("kx") and not any(ticker_lower.startswith(a) for a in KX_ALLOWED):
+                self._debug_counts["kx_sports"] = self._debug_counts.get("kx_sports", 0) + 1
                 return None
 
             return Market(
