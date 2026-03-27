@@ -132,8 +132,13 @@ class MarketScanner:
                 unique.append(m)
         markets = unique
 
-        # Sort by volume descending, return top N
-        markets.sort(key=lambda m: m.volume, reverse=True)
+        # Sort by soonest expiry first so bot targets near-term markets
+        def expiry_key(m):
+            try:
+                return datetime.fromisoformat(m.end_date.replace("Z", "+00:00"))
+            except Exception:
+                return datetime.max.replace(tzinfo=timezone.utc)
+        markets.sort(key=expiry_key)
         logger.info(f"Fetched {len(markets)} unique markets. Rejections: {self._debug_counts}")
         self._debug_counts = {}
         return markets[:limit]
