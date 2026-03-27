@@ -70,6 +70,9 @@ CRITICAL RULES:
 5. Account for time remaining — events far in the future have more uncertainty.
 6. If information is extremely limited, express that through LOW confidence.
 7. Be concise — short reasoning only.
+8. IMPORTANT: If this question is about sports (player stats, game scores, athletic
+   performance, team wins) set confidence to "Low" and probability to 0.5 — these
+   markets are excluded from our strategy.
 
 You MUST call the submit_prediction tool with your analysis."""
 
