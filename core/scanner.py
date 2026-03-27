@@ -78,6 +78,8 @@ class MarketScanner:
 
         markets = []
         cursor = None
+        retries = 0
+        max_retries = 4
 
         while len(markets) < limit:
             try:
@@ -93,9 +95,19 @@ class MarketScanner:
                     params=params,
                     timeout=aiohttp.ClientTimeout(total=30),
                 ) as resp:
+                    if resp.status == 429:
+                        retries += 1
+                        if retries > max_retries:
+                            logger.error("Rate limit retries exhausted. Using markets fetched so far.")
+                            break
+                        wait = 2 ** retries  # 2, 4, 8, 16 seconds
+                        logger.warning(f"Rate limited by Kalshi. Waiting {wait}s before retry {retries}/{max_retries}...")
+                        await asyncio.sleep(wait)
+                        continue
                     if resp.status != 200:
                         logger.error(f"Kalshi API error {resp.status}: {await resp.text()}")
                         break
+                    retries = 0  # reset on success
                     data = await resp.json()
 
                 items = data.get("markets", [])
@@ -108,6 +120,9 @@ class MarketScanner:
 
                 if not cursor or not items:
                     break
+
+                # Polite pause between pages to avoid triggering rate limits
+                await asyncio.sleep(0.5)
 
             except Exception as e:
                 logger.error(f"Error fetching markets: {e}")

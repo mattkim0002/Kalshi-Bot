@@ -41,7 +41,7 @@ IMPACT_THRESHOLD = 0.50     # Warn if slippage eats >50% of edge
 SCAN_INTERVAL_SECONDS = 600     # Scan markets every 10 minutes
 MIN_VOLUME = 1000               # Only consider markets with >$1K 24h volume
 MIN_LIQUIDITY = 500             # Only consider markets with >$500 open interest
-MAX_MARKETS_TO_SCAN = 500       # Fetch up to 500 active markets per scan
+MAX_MARKETS_TO_SCAN = 200       # Fetch up to 200 markets per scan (avoid rate limits)
 
 # ─────────────────────────────────────────────
 # MARKET FILTERS
