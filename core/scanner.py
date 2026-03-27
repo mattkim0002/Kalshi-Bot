@@ -63,10 +63,10 @@ class MarketScanner:
         if self._session and not self._session.closed:
             await self._session.close()
 
-    # Categories we want to trade — politics, economics, finance, crypto, world events
+    # Categories — Financials and Crypto first for same-day markets
     TARGET_CATEGORIES = [
-        "Politics", "Economics", "Financials", "Crypto",
-        "Climate and weather", "Science", "World",
+        "Financials", "Crypto", "Economics",
+        "Politics", "World", "Science", "Climate and weather",
     ]
 
     async def fetch_markets(

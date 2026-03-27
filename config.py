@@ -38,8 +38,9 @@ IMPACT_THRESHOLD = 0.50     # Warn if slippage eats >50% of edge
 # ─────────────────────────────────────────────
 # MARKET SCANNING
 # ─────────────────────────────────────────────
-SCAN_INTERVAL_SECONDS = 600     # Scan markets every 10 minutes
+SCAN_INTERVAL_SECONDS = 300     # Scan every 5 minutes (faster for short-term markets)
 MAX_DAYS_TO_EXPIRY = 9999       # No expiry limit — trade whatever has liquidity
+PREFER_DAYS_TO_EXPIRY = 7       # Prioritize markets expiring within 7 days
 MIN_VOLUME = 0                  # No volume floor — let Claude filter by confidence instead
 MIN_LIQUIDITY = 0               # No open interest requirement (Kalshi markets often show 0)
 MAX_MARKETS_TO_SCAN = 100       # Fetch up to 100 markets per scan (1 API call, no pagination)
