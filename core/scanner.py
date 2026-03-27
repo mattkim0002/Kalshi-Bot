@@ -116,6 +116,19 @@ class MarketScanner:
                 items = data.get("markets", [])
                 cursor = data.get("cursor")
 
+                # Debug: log first item raw so we can see field names/values
+                if pages_fetched == 1 and items:
+                    sample = items[0]
+                    logger.info(
+                        f"[DEBUG] Sample market fields: ticker={sample.get('ticker')} "
+                        f"status={sample.get('status')} "
+                        f"yes_ask={sample.get('yes_ask')} yes_bid={sample.get('yes_bid')} "
+                        f"volume_24h={sample.get('volume_24h')} "
+                        f"open_interest={sample.get('open_interest')} "
+                        f"category={sample.get('category')}"
+                    )
+                    logger.info(f"[DEBUG] Total raw markets on page 1: {len(items)}")
+
                 for item in items:
                     market = self._parse_market(item, min_volume, min_liquidity)
                     if market is not None:
