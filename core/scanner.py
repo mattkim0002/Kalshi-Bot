@@ -63,10 +63,11 @@ class MarketScanner:
         if self._session and not self._session.closed:
             await self._session.close()
 
-    # Categories — Financials and Crypto first for same-day markets
+    # Exact category names from Kalshi app — try variants since API names differ from display
     TARGET_CATEGORIES = [
-        "Financials", "Crypto", "Economics",
-        "Politics", "World", "Science", "Climate and weather",
+        "Financials", "Financial", "Economics", "Crypto",
+        "Climate", "Climate and weather", "Politics",
+        "Tech and Science", "Science", "World",
     ]
 
     async def fetch_markets(
@@ -91,7 +92,7 @@ class MarketScanner:
             try:
                 path = "/trade-api/v2/events"
                 headers = self._sign_request("GET", path) if self._sign_request else {}
-                params = {"status": "open", "category": category, "limit": 100, "with_nested_markets": "true"}
+                params = {"status": "open", "category": category, "limit": 200, "with_nested_markets": "true"}
 
                 async with self._session.get(
                     f"{config.KALSHI_API_BASE}/events",
@@ -108,7 +109,8 @@ class MarketScanner:
                     data = await resp.json()
 
                 events = data.get("events", [])
-                logger.info(f"Category '{category}': {len(events)} events")
+                if events:
+                    logger.info(f"Category '{category}': {len(events)} events")
 
                 for event in events:
                     for mkt in event.get("markets", []):
