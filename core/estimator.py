@@ -86,7 +86,7 @@ class ProbabilityEstimator:
         self.max_searches = config.WEB_SEARCH_MAX
         self.min_confidence = config.MIN_CONFIDENCE
         self.session: Optional[aiohttp.ClientSession] = None
-        self._semaphore = asyncio.Semaphore(5)  # Max 5 concurrent Claude calls
+        self._semaphore = asyncio.Semaphore(config.ESTIMATOR_BATCH_SIZE)  # concurrent Claude calls
 
     async def _ensure_session(self):
         if self.session is None or self.session.closed:
@@ -131,24 +131,21 @@ class ProbabilityEstimator:
         max_concurrent: int = 5,
     ) -> list[Market]:
         """
-        Estimate probabilities for multiple markets, staggered to avoid rate limits.
+        Estimate probabilities for multiple markets concurrently.
+        All markets are fired in parallel (bounded by semaphore) so total
+        time is ~1 Claude call instead of N × stagger_secs.
         """
-        logger.info(f"Estimating probabilities for {len(markets)} markets...")
+        logger.info(f"Estimating probabilities for {len(markets)} markets in parallel...")
 
-        results = []
-        for i, market in enumerate(markets):
-            if i > 0:
-                await asyncio.sleep(config.ESTIMATOR_STAGGER_SECS)
-            result = await self.estimate(market)
-            results.append(result)
+        tasks = [self.estimate(market) for market in markets]
+        results = await asyncio.gather(*tasks, return_exceptions=True)
 
-        successful = [
-            r for r in results
-            if isinstance(r, Market) and r.estimated_prob is not None
-        ]
+        # Filter out exceptions
+        valid = [r for r in results if isinstance(r, Market)]
+        successful = [r for r in valid if r.estimated_prob is not None]
         logger.info(f"Successfully estimated {len(successful)}/{len(markets)} markets")
 
-        return [r for r in results if isinstance(r, Market)]
+        return valid
 
     async def _call_claude(self, market: Market) -> Optional[dict]:
         """
