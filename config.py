@@ -39,9 +39,9 @@ IMPACT_THRESHOLD = 0.50     # Warn if slippage eats >50% of edge
 # MARKET SCANNING
 # ─────────────────────────────────────────────
 SCAN_INTERVAL_SECONDS = 600     # Scan markets every 10 minutes
-MIN_VOLUME = 1000               # Only consider markets with >$1K 24h volume
-MIN_LIQUIDITY = 500             # Only consider markets with >$500 open interest
-MAX_MARKETS_TO_SCAN = 200       # Fetch up to 200 markets per scan (avoid rate limits)
+MIN_VOLUME = 5000               # Only consider markets with >$5K 24h volume (was $1K)
+MIN_LIQUIDITY = 2000            # Only consider markets with >$2K open interest (was $500)
+MAX_MARKETS_TO_SCAN = 100       # Fetch up to 100 markets per scan (1 API call, no pagination)
 
 # ─────────────────────────────────────────────
 # MARKET FILTERS
@@ -68,8 +68,8 @@ CLAUDE_MODEL = "claude-sonnet-4-6"
 WEB_SEARCH_MAX = 3              # Max web searches per market analysis
 MIN_CONFIDENCE = "Medium"       # Minimum confidence: Low, Medium, High
 CONFIDENCE_MAP = {"Low": 1, "Medium": 2, "High": 3}
-ESTIMATOR_BATCH_SIZE = 10       # Markets to analyze per cycle
-ESTIMATOR_STAGGER_SECS = 8      # Seconds between Claude calls
+ESTIMATOR_BATCH_SIZE = 5        # Markets to analyze per cycle (top 5 by volume)
+ESTIMATOR_STAGGER_SECS = 5      # Seconds between Claude calls
 
 # ─────────────────────────────────────────────
 # EXIT STRATEGY
