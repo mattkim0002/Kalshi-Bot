@@ -1,5 +1,5 @@
 """
-Configuration for the Polymarket AI Trading System.
+Configuration for the Kalshi AI Trading System.
 Fill in your credentials and adjust parameters to your risk tolerance.
 """
 import os
@@ -10,23 +10,23 @@ load_dotenv()
 # ─────────────────────────────────────────────
 # API CREDENTIALS
 # ─────────────────────────────────────────────
-# Polymarket.com credentials — private key from your Polygon wallet
-POLYMARKET_PRIVATE_KEY = os.getenv("POLYMARKET_PRIVATE_KEY", "")
-POLYMARKET_FUNDER_ADDRESS = os.getenv("POLYMARKET_FUNDER_ADDRESS", "")
-POLYMARKET_SIGNATURE_TYPE = int(os.getenv("POLYMARKET_SIGNATURE_TYPE", "1"))
+# Kalshi credentials — get from kalshi.com → Settings → API
+# Download your private key as a .pem file
+KALSHI_API_KEY_ID = os.getenv("KALSHI_API_KEY_ID", "")
+KALSHI_PRIVATE_KEY_PATH = os.getenv("KALSHI_PRIVATE_KEY_PATH", "kalshi_private_key.pem")
 ANTHROPIC_API_KEY = os.getenv("ANTHROPIC_API_KEY", "")
 
 # ─────────────────────────────────────────────
 # TRADING MODE
 # ─────────────────────────────────────────────
-DRY_RUN = False  # True = paper trading, False = live with real USDC.
+DRY_RUN = False  # True = paper trading, False = live with real money.
 
 # ─────────────────────────────────────────────
 # RISK MANAGEMENT
 # ─────────────────────────────────────────────
-BANKROLL = 30.0             # Total capital allocated (in USDC)
+BANKROLL = 40.0             # Starting capital (updated live from API)
 KELLY_FRACTION = 0.25       # Quarter-Kelly (0.25 recommended, max 0.5)
-MIN_EDGE = 0.03             # Minimum edge to trade (3%). Below this, skip.
+MIN_EDGE = 0.03             # Minimum edge to trade (3%)
 MAX_POSITION_PCT = 0.15     # Max 15% of bankroll per market
 MAX_DAILY_LOSS = 10.0       # Stop trading if daily losses exceed $10
 MAX_TOTAL_EXPOSURE = 0.50   # Max 50% of bankroll deployed at any time
@@ -38,8 +38,8 @@ IMPACT_THRESHOLD = 0.50     # Warn if slippage eats >50% of edge
 # MARKET SCANNING
 # ─────────────────────────────────────────────
 SCAN_INTERVAL_SECONDS = 600     # Scan markets every 10 minutes
-MIN_VOLUME = 5000               # Only consider markets with >$5K volume
-MIN_LIQUIDITY = 1000            # Only consider markets with >$1K liquidity
+MIN_VOLUME = 1000               # Only consider markets with >$1K 24h volume
+MIN_LIQUIDITY = 500             # Only consider markets with >$500 open interest
 MAX_MARKETS_TO_SCAN = 500       # Fetch up to 500 active markets per scan
 
 # ─────────────────────────────────────────────
@@ -47,7 +47,7 @@ MAX_MARKETS_TO_SCAN = 500       # Fetch up to 500 active markets per scan
 # ─────────────────────────────────────────────
 CLAUDE_MODEL = "claude-sonnet-4-6"
 WEB_SEARCH_MAX = 3              # Max web searches per market analysis
-MIN_CONFIDENCE = "Medium"       # Minimum confidence to consider: Low, Medium, High
+MIN_CONFIDENCE = "Medium"       # Minimum confidence: Low, Medium, High
 CONFIDENCE_MAP = {"Low": 1, "Medium": 2, "High": 3}
 ESTIMATOR_BATCH_SIZE = 10       # Markets to analyze per cycle
 ESTIMATOR_STAGGER_SECS = 8      # Seconds between Claude calls
@@ -69,8 +69,6 @@ POSITIONS_FILE = "positions.json"
 PNL_FILE = "pnl.json"
 
 # ─────────────────────────────────────────────
-# POLYMARKET.COM API
+# KALSHI API
 # ─────────────────────────────────────────────
-CLOB_HOST = "https://clob.polymarket.com"
-GAMMA_API_BASE = "https://gamma-api.polymarket.com"
-CHAIN_ID = 137  # Polygon mainnet
+KALSHI_API_BASE = "https://api.elections.kalshi.com/trade-api/v2"

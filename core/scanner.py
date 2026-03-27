@@ -1,7 +1,7 @@
 """
-Multi-Market Scanner for Polymarket.com.
+Multi-Market Scanner for Kalshi.com.
 
-Fetches active markets via the Gamma API (metadata + prices),
+Fetches active markets via the Kalshi REST API,
 filters by volume/liquidity, and ranks by estimated edge.
 """
 import asyncio
@@ -18,16 +18,16 @@ logger = logging.getLogger(__name__)
 
 @dataclass
 class Market:
-    """Represents a single Polymarket.com market."""
-    condition_id: str       # condition_id used as internal ID
+    """Represents a single Kalshi market."""
+    condition_id: str       # ticker used as internal ID
     question: str
-    slug: str
-    yes_price: float        # implied YES probability
-    no_price: float
-    yes_token_id: str       # CLOB token ID for YES outcome
-    no_token_id: str        # CLOB token ID for NO outcome
-    volume: float
-    liquidity: float
+    slug: str               # ticker
+    yes_price: float        # YES probability (0-1)
+    no_price: float         # NO probability (0-1)
+    yes_token_id: str       # ticker (used for order placement)
+    no_token_id: str        # ticker (used for order placement)
+    volume: float           # 24h volume in USD
+    liquidity: float        # open interest in USD
     end_date: Optional[str] = None
     category: str = ""
     description: str = ""
@@ -41,11 +41,11 @@ class Market:
 
 class MarketScanner:
     """
-    Scans Polymarket.com for active markets using the Gamma API.
+    Scans Kalshi for active markets using their REST API.
 
     Flow:
-    1. Fetch active markets from gamma-api.polymarket.com
-    2. Filter by minimum volume and liquidity
+    1. Fetch active markets from Kalshi API
+    2. Filter by minimum volume and open interest
     3. Return sorted by volume (most liquid first)
     """
 
@@ -67,7 +67,7 @@ class MarketScanner:
         min_liquidity: float = None,
     ) -> list[Market]:
         """
-        Fetch active markets from Polymarket.com Gamma API.
+        Fetch active markets from Kalshi API.
         Returns markets sorted by volume (highest first).
         """
         await self._ensure_session()
@@ -77,115 +77,120 @@ class MarketScanner:
         min_liquidity = min_liquidity or config.MIN_LIQUIDITY
 
         markets = []
-        offset = 0
-        batch_size = 100
+        cursor = None
 
         while len(markets) < limit:
             try:
                 params = {
-                    "active": "true",
-                    "closed": "false",
-                    "limit": batch_size,
-                    "offset": offset,
-                    "order": "volume24hr",
-                    "ascending": "false",
+                    "status": "active",
+                    "limit": 200,
                 }
+                if cursor:
+                    params["cursor"] = cursor
+
                 async with self._session.get(
-                    f"{config.GAMMA_API_BASE}/markets",
+                    f"{config.KALSHI_API_BASE}/markets",
                     params=params,
                     timeout=aiohttp.ClientTimeout(total=30),
                 ) as resp:
                     if resp.status != 200:
-                        logger.error(f"Gamma API error {resp.status}")
+                        logger.error(f"Kalshi API error {resp.status}: {await resp.text()}")
                         break
-                    items = await resp.json()
+                    data = await resp.json()
 
-                if not items:
-                    break
+                items = data.get("markets", [])
+                cursor = data.get("cursor")
 
-                for data in items:
-                    market = self._parse_market(data, min_volume, min_liquidity)
+                for item in items:
+                    market = self._parse_market(item, min_volume, min_liquidity)
                     if market is not None:
                         markets.append(market)
 
-                offset += batch_size
-                if len(items) < batch_size:
+                if not cursor or not items:
                     break
 
             except Exception as e:
                 logger.error(f"Error fetching markets: {e}")
                 break
 
+        # Sort by volume descending
+        markets.sort(key=lambda m: m.volume, reverse=True)
         logger.info(f"Fetched {len(markets)} markets meeting criteria")
         return markets[:limit]
 
     def _parse_market(self, data: dict, min_volume: float, min_liquidity: float) -> Optional[Market]:
-        """Parse a market from Gamma API response."""
+        """Parse a Kalshi market entry."""
         try:
-            # Skip closed/resolved markets
-            if data.get("closed") or not data.get("active"):
+            if data.get("status") != "active":
                 return None
 
-            # Must have token data
-            tokens = data.get("tokens", [])
-            if len(tokens) < 2:
+            ticker = data.get("ticker", "")
+            if not ticker:
                 return None
 
-            # Find YES and NO tokens
-            yes_token = next((t for t in tokens if t.get("outcome", "").upper() == "YES"), tokens[0])
-            no_token = next((t for t in tokens if t.get("outcome", "").upper() == "NO"), tokens[1])
+            # Prices come as cents (1-99), convert to 0-1
+            yes_ask = data.get("yes_ask", 0) or 0
+            yes_bid = data.get("yes_bid", 0) or 0
+            last_price = data.get("last_price", 0) or 0
 
-            yes_price = float(yes_token.get("price", 0) or 0)
-            no_price = float(no_token.get("price", 0) or 0)
-
-            # Skip unpriced or near-resolved markets
-            if yes_price <= 0.02 or yes_price >= 0.98:
+            # Use mid-price or last trade price
+            if yes_ask > 0 and yes_bid > 0:
+                yes_price = (yes_ask + yes_bid) / 2 / 100
+            elif last_price > 0:
+                yes_price = last_price / 100
+            else:
                 return None
 
-            volume = float(data.get("volume", 0) or data.get("volume24hr", 0) or 0)
-            liquidity = float(data.get("liquidity", 0) or 0)
+            # Skip near-resolved markets
+            if yes_price <= 0.03 or yes_price >= 0.97:
+                return None
+
+            no_price = 1 - yes_price
+
+            # Volume in cents → dollars
+            volume = float(data.get("volume_24h", 0) or 0) / 100
+            liquidity = float(data.get("open_interest", 0) or 0) / 100
 
             if volume < min_volume or liquidity < min_liquidity:
                 return None
 
-            slug = data.get("slug", "")
-            condition_id = data.get("conditionId", slug)
+            title = data.get("title", "") or data.get("subtitle", "") or ticker
+            event_ticker = data.get("event_ticker", "")
 
             return Market(
-                condition_id=condition_id,
-                question=data.get("question", ""),
-                slug=slug,
+                condition_id=ticker,
+                question=title,
+                slug=ticker,
                 yes_price=yes_price,
                 no_price=no_price,
-                yes_token_id=yes_token.get("token_id", ""),
-                no_token_id=no_token.get("token_id", ""),
+                yes_token_id=ticker,
+                no_token_id=ticker,
                 volume=volume,
                 liquidity=liquidity,
-                end_date=data.get("endDate"),
+                end_date=data.get("expiration_time", ""),
                 category=data.get("category", ""),
-                description=data.get("description", ""),
-                url=f"https://polymarket.com/event/{slug}",
+                description=data.get("subtitle", ""),
+                url=f"https://kalshi.com/markets/{event_ticker}/{ticker}",
             )
         except (ValueError, KeyError, TypeError) as e:
             logger.debug(f"Skipping malformed market: {e}")
             return None
 
-    async def fetch_single_market(self, condition_id: str) -> Optional[Market]:
-        """Fetch a single market by condition ID."""
+    async def fetch_single_market(self, ticker: str) -> Optional[Market]:
+        """Fetch a single market by ticker."""
         await self._ensure_session()
         try:
             async with self._session.get(
-                f"{config.GAMMA_API_BASE}/markets",
-                params={"conditionId": condition_id},
+                f"{config.KALSHI_API_BASE}/markets/{ticker}",
                 timeout=aiohttp.ClientTimeout(total=15),
             ) as resp:
                 if resp.status != 200:
                     return None
-                items = await resp.json()
-                if items:
-                    return self._parse_market(items[0], 0, 0)
+                data = await resp.json()
+                market_data = data.get("market", data)
+                return self._parse_market(market_data, 0, 0)
         except Exception as e:
-            logger.error(f"Error fetching market {condition_id}: {e}")
+            logger.error(f"Error fetching market {ticker}: {e}")
         return None
 
     def rank_by_edge(self, markets: list[Market]) -> list[Market]:

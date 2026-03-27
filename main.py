@@ -66,7 +66,7 @@ class TradingSystem:
 
         try:
             # Sync live balance before printing banner so it shows real balance
-            await self.portfolio.sync_balance(self.scanner._client)
+            await self.portfolio.sync_balance(self.executor)
             self._print_banner()
 
             while self._running:
@@ -76,7 +76,7 @@ class TradingSystem:
                 await self._run_cycle()
 
                 # Re-sync balance after each cycle to pick up deposits/withdrawals
-                await self.portfolio.sync_balance(self.scanner._client)
+                await self.portfolio.sync_balance(self.executor)
                 
                 self.portfolio.print_summary()
                 
@@ -319,10 +319,10 @@ class TradingSystem:
             sys.exit(1)
         
         if not config.DRY_RUN:
-            if not config.POLYMARKET_PRIVATE_KEY:
+            if not config.KALSHI_API_KEY_ID:
                 logger.error(
-                    "Live trading enabled but POLYMARKET_PRIVATE_KEY not set. "
-                    "Set DRY_RUN=True or provide your wallet private key."
+                    "Live trading enabled but KALSHI_API_KEY_ID not set. "
+                    "Set DRY_RUN=True or add your Kalshi API key to .env"
                 )
                 sys.exit(1)
             

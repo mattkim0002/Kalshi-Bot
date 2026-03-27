@@ -86,10 +86,9 @@ class PortfolioManager:
         if config.DRY_RUN or client is None:
             return self.bankroll
         try:
-            # py-clob-client returns USDC balance in wei (6 decimals)
-            balance_wei = await asyncio.to_thread(client.get_balance)
-            balance = float(balance_wei) / 1e6
-            if balance >= 0:
+            # executor.get_balance() returns dollars directly
+            balance = await client.get_balance()
+            if balance is not None and balance >= 0:
                 self.bankroll = balance
                 if balance > self.peak_bankroll:
                     self.peak_bankroll = balance
