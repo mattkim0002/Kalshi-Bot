@@ -97,19 +97,27 @@ class PortfolioManager:
                 if not self._balance_synced:
                     self.peak_bankroll = balance
                     self._balance_synced = True
-                elif balance > self.peak_bankroll:
-                    self.peak_bankroll = balance
+                # Update peak using total equity so deployed capital isn't counted as drawdown
+                equity = self.total_equity
+                if equity > self.peak_bankroll:
+                    self.peak_bankroll = equity
                 logger.info(f"Account balance synced: ${self.bankroll:.2f}")
         except Exception as e:
             logger.warning(f"Could not sync balance from API: {e}. Using ${self.bankroll:.2f}")
         return self.bankroll
 
     @property
+    def total_equity(self) -> float:
+        """Available balance + value of open positions (deployed capital)."""
+        deployed = sum(p.current_value for p in self.positions.values())
+        return self.bankroll + deployed
+
+    @property
     def drawdown_from_peak(self) -> float:
-        """Current drawdown from peak bankroll (0.0 to 1.0)."""
+        """Current drawdown from peak equity (0.0 to 1.0)."""
         if self.peak_bankroll <= 0:
             return 0.0
-        return max(0.0, (self.peak_bankroll - self.bankroll) / self.peak_bankroll)
+        return max(0.0, (self.peak_bankroll - self.total_equity) / self.peak_bankroll)
 
     @property
     def drawdown_kelly_multiplier(self) -> float:
