@@ -5,6 +5,7 @@ Fetches active markets via the Kalshi REST API,
 filters by volume/liquidity, and ranks by estimated edge.
 """
 import asyncio
+import json
 import logging
 from dataclasses import dataclass
 from typing import Optional
@@ -116,18 +117,10 @@ class MarketScanner:
                 items = data.get("markets", [])
                 cursor = data.get("cursor")
 
-                # Debug: log first item raw so we can see field names/values
+                # Debug: log first item raw so we can see all field names
                 if pages_fetched == 1 and items:
-                    sample = items[0]
-                    logger.info(
-                        f"[DEBUG] Sample market fields: ticker={sample.get('ticker')} "
-                        f"status={sample.get('status')} "
-                        f"yes_ask={sample.get('yes_ask')} yes_bid={sample.get('yes_bid')} "
-                        f"volume_24h={sample.get('volume_24h')} "
-                        f"open_interest={sample.get('open_interest')} "
-                        f"category={sample.get('category')}"
-                    )
                     logger.info(f"[DEBUG] Total raw markets on page 1: {len(items)}")
+                    logger.info(f"[DEBUG] Full sample market: {json.dumps(items[0], indent=2)}")
 
                 for item in items:
                     market = self._parse_market(item, min_volume, min_liquidity)
