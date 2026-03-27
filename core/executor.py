@@ -200,7 +200,7 @@ class TradeExecutor:
         await self._ensure_session()
         try:
             path = "/trade-api/v2/portfolio/orders"
-            url = f"https://api.elections.kalshi.com{path}"
+            url = f"https://trading-api.kalshi.com{path}"
             headers = self._sign_request("POST", path)
 
             payload = {
@@ -239,7 +239,7 @@ class TradeExecutor:
         await self._ensure_session()
         try:
             path = "/trade-api/v2/portfolio/orders"
-            url = f"https://api.elections.kalshi.com{path}"
+            url = f"https://trading-api.kalshi.com{path}"
             headers = self._sign_request("POST", path)
 
             payload = {
@@ -281,7 +281,7 @@ class TradeExecutor:
         await self._ensure_session()
         try:
             path = "/trade-api/v2/portfolio/balance"
-            url = f"https://api.elections.kalshi.com{path}"
+            url = f"https://trading-api.kalshi.com{path}"
             headers = self._sign_request("GET", path)
 
             async with self._session.get(url, headers=headers, timeout=aiohttp.ClientTimeout(total=15)) as resp:

@@ -90,4 +90,4 @@ PNL_FILE = "pnl.json"
 # ─────────────────────────────────────────────
 # KALSHI API
 # ─────────────────────────────────────────────
-KALSHI_API_BASE = "https://api.elections.kalshi.com/trade-api/v2"
+KALSHI_API_BASE = "https://trading-api.kalshi.com/trade-api/v2"
