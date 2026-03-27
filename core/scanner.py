@@ -193,9 +193,10 @@ class MarketScanner:
             ticker_lower = ticker.lower()
             if any(kw in title_lower or kw in ticker_lower for kw in config.EXCLUDED_KEYWORDS):
                 return None
-            # Block Kalshi Exchange sports tickers (KX prefix + sport codes)
-            sport_codes = ("nba", "nfl", "mlb", "nhl", "ncp", "mbb", "wbb", "cfb", "cbb", "nascar", "pga", "ufc")
-            if ticker_lower.startswith("kx") and any(s in ticker_lower for s in sport_codes):
+            # Kalshi Exchange (KX prefix) is almost entirely sports.
+            # Whitelist only KX crypto/finance tickers we want; block all other KX.
+            KX_ALLOWED = ("kxbtc", "kxeth", "kxsol", "kxspy", "kxqqq", "kxgold", "kxoil")
+            if ticker_lower.startswith("kx") and not any(ticker_lower.startswith(a) for a in KX_ALLOWED):
                 return None
 
             return Market(
