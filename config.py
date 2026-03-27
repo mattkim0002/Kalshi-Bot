@@ -24,7 +24,7 @@ DRY_RUN = False  # True = paper trading, False = live with real money.
 # ─────────────────────────────────────────────
 # RISK MANAGEMENT
 # ─────────────────────────────────────────────
-BANKROLL = 10.0             # Starting capital (updated live from API)
+BANKROLL = 10.0             # Fallback for dry-run only — live mode always syncs from API
 KELLY_FRACTION = 0.25       # Quarter-Kelly (0.25 recommended, max 0.5)
 MIN_EDGE = 0.06             # Minimum edge to trade (6% — higher bar for small account)
 MAX_POSITION_PCT = 0.15     # Max 15% of bankroll per market (~$1.50 on $10)

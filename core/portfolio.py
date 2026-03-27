@@ -74,8 +74,9 @@ class PortfolioManager:
         self.trade_history: list[TradeRecord] = []
         self.daily_pnl: float = 0.0
         self.daily_pnl_reset_time: float = time.time()
-        self.bankroll: float = config.BANKROLL  # updated from live API
-        self.peak_bankroll: float = config.BANKROLL  # for drawdown protection
+        self.bankroll: float = config.BANKROLL  # overwritten on first API sync
+        self.peak_bankroll: float = config.BANKROLL
+        self._balance_synced: bool = False      # True after first live API sync
         self._load_state()
 
     async def sync_balance(self, client) -> float:
@@ -90,7 +91,13 @@ class PortfolioManager:
             balance = await client.get_balance()
             if balance is not None and balance >= 0:
                 self.bankroll = balance
-                if balance > self.peak_bankroll:
+                # On first sync, anchor peak to the real account balance so
+                # drawdown is measured from what's actually in the account,
+                # not a hardcoded config value.
+                if not self._balance_synced:
+                    self.peak_bankroll = balance
+                    self._balance_synced = True
+                elif balance > self.peak_bankroll:
                     self.peak_bankroll = balance
                 logger.info(f"Account balance synced: ${self.bankroll:.2f}")
         except Exception as e:
