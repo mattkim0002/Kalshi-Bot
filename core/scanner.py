@@ -62,6 +62,12 @@ class MarketScanner:
         if self._session and not self._session.closed:
             await self._session.close()
 
+    # Categories we want to trade — politics, economics, finance, crypto, world events
+    TARGET_CATEGORIES = [
+        "Politics", "Economics", "Financials", "Crypto",
+        "Climate and weather", "Science", "World",
+    ]
+
     async def fetch_markets(
         self,
         limit: int = None,
@@ -69,8 +75,8 @@ class MarketScanner:
         min_liquidity: float = None,
     ) -> list[Market]:
         """
-        Fetch active markets from Kalshi API.
-        Returns markets sorted by volume (highest first).
+        Fetch active markets from Kalshi via the events API.
+        Filters by category so we only get politics/economics/crypto markets.
         """
         await self._ensure_session()
 
@@ -79,69 +85,43 @@ class MarketScanner:
         min_liquidity = min_liquidity or config.MIN_LIQUIDITY
 
         markets = []
-        cursor = None
-        retries = 0
-        max_retries = 4
-        pages_fetched = 0
-        max_pages = 8  # Fetch up to 8 pages to get past bulk sports markets
 
-        while pages_fetched < max_pages:
+        for category in self.TARGET_CATEGORIES:
             try:
-                params = {
-                    "status": "open",
-                    "limit": 200,
-                }
-                if cursor:
-                    params["cursor"] = cursor
-
-                path = "/trade-api/v2/markets"
+                path = "/trade-api/v2/events"
                 headers = self._sign_request("GET", path) if self._sign_request else {}
+                params = {"status": "open", "category": category, "limit": 100}
+
                 async with self._session.get(
-                    f"{config.KALSHI_API_BASE}/markets",
+                    f"{config.KALSHI_API_BASE}/events",
                     params=params,
                     headers=headers,
                     timeout=aiohttp.ClientTimeout(total=30),
                 ) as resp:
                     if resp.status == 429:
-                        retries += 1
-                        if retries > max_retries:
-                            logger.error("Rate limit retries exhausted. Using markets fetched so far.")
-                            break
-                        wait = 2 ** retries  # 2, 4, 8, 16 seconds
-                        logger.warning(f"Rate limited by Kalshi. Waiting {wait}s before retry {retries}/{max_retries}...")
-                        await asyncio.sleep(wait)
+                        await asyncio.sleep(4)
                         continue
                     if resp.status != 200:
-                        logger.error(f"Kalshi API error {resp.status}: {await resp.text()}")
-                        break
-                    retries = 0  # reset on success
+                        logger.warning(f"Events API error {resp.status} for category {category}: {await resp.text()}")
+                        continue
                     data = await resp.json()
 
-                pages_fetched += 1
-                items = data.get("markets", [])
-                cursor = data.get("cursor")
+                events = data.get("events", [])
+                logger.info(f"Category '{category}': {len(events)} events")
 
-                # Debug: log first item raw so we can see all field names
-                if pages_fetched == 1 and items:
-                    logger.info(f"[DEBUG] Total raw markets on page 1: {len(items)}")
-                    logger.info(f"[DEBUG] Full sample market: {json.dumps(items[0], indent=2)}")
+                for event in events:
+                    for mkt in event.get("markets", []):
+                        market = self._parse_market(mkt, min_volume, min_liquidity)
+                        if market is not None:
+                            markets.append(market)
 
-                for item in items:
-                    market = self._parse_market(item, min_volume, min_liquidity)
-                    if market is not None:
-                        markets.append(market)
-
-                if not cursor or not items:
-                    break
-
-                # Polite pause between pages to avoid triggering rate limits
-                await asyncio.sleep(0.5)
+                await asyncio.sleep(0.3)  # polite pause between categories
 
             except Exception as e:
-                logger.error(f"Error fetching markets: {e}")
-                break
+                logger.error(f"Error fetching category {category}: {e}")
+                continue
 
-        # Sort by volume descending
+        # Sort by volume descending, return top N
         markets.sort(key=lambda m: m.volume, reverse=True)
         logger.info(f"Fetched {len(markets)} markets meeting criteria. Rejections: {self._debug_counts}")
         self._debug_counts = {}
