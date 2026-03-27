@@ -121,9 +121,19 @@ class MarketScanner:
                 logger.error(f"Error fetching category {category}: {e}")
                 continue
 
+        # Deduplicate by question text (same event can appear multiple times)
+        seen = set()
+        unique = []
+        for m in markets:
+            key = m.question.strip().lower()
+            if key not in seen:
+                seen.add(key)
+                unique.append(m)
+        markets = unique
+
         # Sort by volume descending, return top N
         markets.sort(key=lambda m: m.volume, reverse=True)
-        logger.info(f"Fetched {len(markets)} markets meeting criteria. Rejections: {self._debug_counts}")
+        logger.info(f"Fetched {len(markets)} unique markets. Rejections: {self._debug_counts}")
         self._debug_counts = {}
         return markets[:limit]
 
