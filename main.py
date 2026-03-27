@@ -157,25 +157,36 @@ class TradingSystem:
         """
         Analyze a market opportunity and execute if all criteria are met.
         """
-        # Drawdown protection: pause if 30% down, halve sizing if 20% down
+        # Drawdown protection (Chan): pause if 30% down, halve sizing if 20% down
         dd_multiplier = self.portfolio.drawdown_kelly_multiplier
         if dd_multiplier == 0.0:
             logger.warning("Trading paused — drawdown limit reached")
             return
 
+        # Signal health check (Simons): reduce sizing if recent win rate < 45%
+        signal_multiplier = self.portfolio.signal_health_multiplier
+
+        # Correlation check (Simons): skip if new bet is too correlated with existing positions
+        direction = "YES" if (market.estimated_prob or 0) > market.yes_price else "NO"
+        correlation = self.portfolio.correlation_risk(market.question, direction)
+        if correlation > 0.6:
+            logger.info(f"SKIP: {market.question[:50]}... — Too correlated with existing positions ({correlation:.0%})")
+            return
+
         # Long-shot bias correction (Taleb): underdog markets (5-20%) are
-        # systematically underpriced by crowds. Apply a small upward correction.
-        yes_price = market.yes_price
-        if 0.05 <= yes_price <= 0.20:
-            market.estimated_prob = min(0.99, market.estimated_prob * 1.08)
-            logger.debug(f"Long-shot bias correction applied for {market.question[:40]}")
+        # systematically underpriced by crowds.
+        if 0.05 <= market.yes_price <= 0.20:
+            market.estimated_prob = min(0.99, (market.estimated_prob or 0) * 1.08)
+
+        # Combined Kelly multiplier
+        combined_multiplier = config.KELLY_FRACTION * dd_multiplier * signal_multiplier
 
         # Run full trade analysis
         analysis = self.lmsr.analyze_trade(
             market_price=market.yes_price,
             estimated_prob=market.estimated_prob,
             bankroll=self.portfolio.available_capital,
-            kelly_multiplier=config.KELLY_FRACTION * dd_multiplier,
+            kelly_multiplier=combined_multiplier,
             min_edge=config.MIN_EDGE,
             max_position_pct=config.MAX_POSITION_PCT,
             impact_threshold=config.IMPACT_THRESHOLD,

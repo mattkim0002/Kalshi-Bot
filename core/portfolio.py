@@ -120,7 +120,51 @@ class PortfolioManager:
             return 0.5
         return 1.0
 
-    # ── Position Management ──────────────────────────
+    def correlation_risk(self, new_question: str, new_direction: str) -> float:
+        """
+        Estimate directional correlation between a new trade and existing positions.
+        Returns 0.0 (independent) to 1.0 (fully correlated).
+        Simons: 'Every bet is a function of all the other bets.'
+        """
+        if not self.positions:
+            return 0.0
+
+        # Simple keyword-based correlation detector
+        new_words = set(new_question.lower().split())
+        correlated = 0
+        for pos in self.positions.values():
+            pos_words = set(pos.question.lower().split())
+            overlap = len(new_words & pos_words) / max(len(new_words), 1)
+            # Same direction + similar topic = correlated
+            if pos.direction == new_direction and overlap > 0.3:
+                correlated += 1
+        return min(1.0, correlated / max(len(self.positions), 1))
+
+    @property
+    def rolling_win_rate(self) -> Optional[float]:
+        """
+        Win rate over last 20 closed trades.
+        Simons: auto-reduce when strategy underperforms.
+        """
+        sells = [t for t in self.trade_history if t.action == "SELL"][-20:]
+        if len(sells) < 5:
+            return None
+        wins = sum(1 for t in sells if t.price > t.market_price_at_trade)
+        return wins / len(sells)
+
+    @property
+    def signal_health_multiplier(self) -> float:
+        """
+        Auto-reduce position sizes if rolling win rate drops below 45%.
+        Returns 1.0 = normal, 0.5 = reduce, signals degrading.
+        """
+        wr = self.rolling_win_rate
+        if wr is None:
+            return 1.0  # Not enough data yet
+        if wr < 0.45:
+            logger.warning(f"Rolling win rate {wr:.0%} — reducing position sizes (signal health check)")
+            return 0.5
+        return 1.0
 
     def open_position(
         self,
@@ -335,6 +379,10 @@ class PortfolioManager:
         ev = self.expectancy_per_dollar
         if s['total_trades'] > 0:
             print(f"  EV per dollar:       {ev:+.3f}")
+        wr = self.rolling_win_rate
+        if wr is not None:
+            flag = " ⚠️" if wr < 0.45 else ""
+            print(f"  Rolling win rate:    {wr:.0%} (last 20 trades){flag}")
         
         if self.positions:
             print("\n  POSITIONS:")
