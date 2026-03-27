@@ -31,7 +31,7 @@ MAX_POSITION_PCT = 0.15     # Max 15% of bankroll per market (~$1.50 on $10)
 MIN_POSITION_USD = 1.00     # Never place an order smaller than $1 (below Kalshi minimums)
 MAX_DAILY_LOSS = 2.00       # Stop trading if daily losses exceed $2 (20% of bankroll)
 MAX_TOTAL_EXPOSURE = 0.40   # Max 40% of bankroll deployed at any time ($4 max out)
-MAX_POSITIONS = 4           # Max 4 simultaneous positions on a $10 account
+MAX_POSITIONS = 8           # Max 8 simultaneous positions on a $50+ account
 MAX_POSITIONS_PER_MARKET = 1  # Max 1 position per unique market question
 IMPACT_THRESHOLD = 0.50     # Warn if slippage eats >50% of edge
 
