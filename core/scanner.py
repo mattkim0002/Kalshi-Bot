@@ -90,7 +90,7 @@ class MarketScanner:
             try:
                 path = "/trade-api/v2/events"
                 headers = self._sign_request("GET", path) if self._sign_request else {}
-                params = {"status": "open", "category": category, "limit": 100}
+                params = {"status": "open", "category": category, "limit": 100, "with_nested_markets": "true"}
 
                 async with self._session.get(
                     f"{config.KALSHI_API_BASE}/events",
