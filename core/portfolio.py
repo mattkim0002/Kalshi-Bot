@@ -75,6 +75,7 @@ class PortfolioManager:
         self.daily_pnl: float = 0.0
         self.daily_pnl_reset_time: float = time.time()
         self.bankroll: float = config.BANKROLL  # updated from live API
+        self.peak_bankroll: float = config.BANKROLL  # for drawdown protection
         self._load_state()
 
     async def sync_balance(self, client) -> float:
@@ -90,10 +91,34 @@ class PortfolioManager:
             balance = float(balance_wei) / 1e6
             if balance >= 0:
                 self.bankroll = balance
+                if balance > self.peak_bankroll:
+                    self.peak_bankroll = balance
                 logger.info(f"Account balance synced: ${self.bankroll:.2f}")
         except Exception as e:
             logger.warning(f"Could not sync balance from API: {e}. Using ${self.bankroll:.2f}")
         return self.bankroll
+
+    @property
+    def drawdown_from_peak(self) -> float:
+        """Current drawdown from peak bankroll (0.0 to 1.0)."""
+        if self.peak_bankroll <= 0:
+            return 0.0
+        return max(0.0, (self.peak_bankroll - self.bankroll) / self.peak_bankroll)
+
+    @property
+    def drawdown_kelly_multiplier(self) -> float:
+        """
+        Halve position sizes if drawdown exceeds 20% (from Algorithmic Trading, Chan).
+        Returns a multiplier: 1.0 = normal, 0.5 = half sizing, 0.25 = quarter sizing.
+        """
+        dd = self.drawdown_from_peak
+        if dd >= 0.30:
+            logger.warning(f"Drawdown {dd:.0%} — STRATEGY PAUSED (30% limit hit)")
+            return 0.0
+        elif dd >= 0.20:
+            logger.warning(f"Drawdown {dd:.0%} — halving position sizes")
+            return 0.5
+        return 1.0
 
     # ── Position Management ──────────────────────────
 
@@ -276,6 +301,22 @@ class PortfolioManager:
             },
         }
 
+    @property
+    def expectancy_per_dollar(self) -> float:
+        """
+        Expected value per dollar risked across all closed trades.
+        Positive = profitable strategy. (Van Tharp R-multiple concept)
+        """
+        sells = [t for t in self.trade_history if t.action == "SELL"]
+        if not sells:
+            return 0.0
+        total_risked = sum(t.amount_usd for t in sells)
+        total_pnl = sum(
+            (t.price - t.market_price_at_trade) * t.shares
+            for t in sells
+        )
+        return total_pnl / total_risked if total_risked > 0 else 0.0
+
     def print_summary(self):
         """Print a formatted portfolio summary to the console."""
         s = self.summary()
@@ -288,6 +329,12 @@ class PortfolioManager:
         print(f"  Unrealized P&L:      ${s['total_unrealized_pnl']:+,.2f}")
         print(f"  Daily realized P&L:  ${s['daily_realized_pnl']:+,.2f}")
         print(f"  Total trades:        {s['total_trades']}")
+        dd = self.drawdown_from_peak
+        if dd > 0.05:
+            print(f"  Drawdown from peak:  {dd:.1%} ⚠️")
+        ev = self.expectancy_per_dollar
+        if s['total_trades'] > 0:
+            print(f"  EV per dollar:       {ev:+.3f}")
         
         if self.positions:
             print("\n  POSITIONS:")
