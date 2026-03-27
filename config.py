@@ -10,9 +10,10 @@ load_dotenv()
 # ─────────────────────────────────────────────
 # API CREDENTIALS
 # ─────────────────────────────────────────────
-# Polymarket US credentials — get from polymarket.us/developer
-POLYMARKET_KEY_ID = os.getenv("POLYMARKET_KEY_ID", "")
-POLYMARKET_SECRET_KEY = os.getenv("POLYMARKET_SECRET_KEY", "")
+# Polymarket.com credentials — private key from your Polygon wallet
+POLYMARKET_PRIVATE_KEY = os.getenv("POLYMARKET_PRIVATE_KEY", "")
+POLYMARKET_FUNDER_ADDRESS = os.getenv("POLYMARKET_FUNDER_ADDRESS", "")
+POLYMARKET_SIGNATURE_TYPE = int(os.getenv("POLYMARKET_SIGNATURE_TYPE", "1"))
 ANTHROPIC_API_KEY = os.getenv("ANTHROPIC_API_KEY", "")
 
 # ─────────────────────────────────────────────
@@ -68,7 +69,8 @@ POSITIONS_FILE = "positions.json"
 PNL_FILE = "pnl.json"
 
 # ─────────────────────────────────────────────
-# POLYMARKET US API
+# POLYMARKET.COM API
 # ─────────────────────────────────────────────
-POLYMARKET_API_BASE = "https://api.polymarket.us/v1"
-POLYMARKET_GATEWAY_BASE = "https://gateway.polymarket.us/v1"
+CLOB_HOST = "https://clob.polymarket.com"
+GAMMA_API_BASE = "https://gamma-api.polymarket.com"
+CHAIN_ID = 137  # Polygon mainnet

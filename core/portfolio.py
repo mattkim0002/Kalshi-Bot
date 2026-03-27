@@ -85,19 +85,12 @@ class PortfolioManager:
         if config.DRY_RUN or client is None:
             return self.bankroll
         try:
-            data = await asyncio.to_thread(client.account.balances)
-            if isinstance(data, dict) and "balances" in data:
-                entry = data["balances"][0] if data["balances"] else {}
-                balance = entry.get("buyingPower")
-            elif isinstance(data, dict):
-                balance = data.get("buyingPower")
-            else:
-                balance = getattr(data, "buyingPower", None)
-            if balance is not None:
-                self.bankroll = float(balance)
+            # py-clob-client returns USDC balance in wei (6 decimals)
+            balance_wei = await asyncio.to_thread(client.get_balance)
+            balance = float(balance_wei) / 1e6
+            if balance >= 0:
+                self.bankroll = balance
                 logger.info(f"Account balance synced: ${self.bankroll:.2f}")
-            else:
-                logger.warning(f"Could not find balance in response: {data}")
         except Exception as e:
             logger.warning(f"Could not sync balance from API: {e}. Using ${self.bankroll:.2f}")
         return self.bankroll

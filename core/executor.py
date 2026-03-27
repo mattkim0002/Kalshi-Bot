@@ -1,7 +1,7 @@
 """
-Trade Executor for Polymarket US.
+Trade Executor for Polymarket.com.
 
-Handles order placement via the polymarket-us SDK.
+Handles order placement via the py-clob-client SDK.
 Supports both dry-run (paper trading) and live execution.
 """
 import asyncio
@@ -18,12 +18,14 @@ logger = logging.getLogger(__name__)
 
 _sdk_available = False
 try:
-    from polymarket_us import PolymarketUS
+    from py_clob_client.client import ClobClient
+    from py_clob_client.clob_types import MarketOrderArgs, OrderType
+    from py_clob_client.order_builder.constants import BUY, SELL
     _sdk_available = True
 except ImportError:
     logger.info(
-        "polymarket-us not installed. Live trading disabled. "
-        "Install with: pip install polymarket-us"
+        "py-clob-client not installed. Live trading disabled. "
+        "Install with: pip install py-clob-client"
     )
 
 
@@ -46,13 +48,13 @@ class OrderResult:
 
 class TradeExecutor:
     """
-    Executes trades on Polymarket US.
+    Executes trades on Polymarket.com using py-clob-client.
 
     In DRY_RUN mode: simulates fills at current market price.
-    In live mode: places FOK market orders via the polymarket-us SDK.
+    In live mode: places FOK market orders via the CLOB API.
 
-    token_id parameters are market slugs on Polymarket US.
-    direction ("YES"/"NO") maps to intents (BUY_LONG/BUY_SHORT, SELL_LONG/SELL_SHORT).
+    token_id parameters are the YES/NO token IDs from the CLOB.
+    direction ("YES"/"NO") determines which token to buy/sell.
     """
 
     def __init__(self):
@@ -63,29 +65,34 @@ class TradeExecutor:
             self._init_live_client()
 
     def _init_live_client(self):
-        """Initialize the Polymarket US client for live trading."""
+        """Initialize the Polymarket CLOB client for live trading."""
         if not _sdk_available:
             logger.error(
-                "Cannot enable live trading: polymarket-us not installed. "
-                "Run: pip install polymarket-us"
+                "Cannot enable live trading: py-clob-client not installed. "
+                "Run: pip install py-clob-client"
             )
             self.dry_run = True
             return
 
-        if not config.POLYMARKET_KEY_ID or not config.POLYMARKET_SECRET_KEY:
+        if not config.POLYMARKET_PRIVATE_KEY:
             logger.error(
-                "POLYMARKET_KEY_ID or POLYMARKET_SECRET_KEY not set. "
-                "Falling back to dry run."
+                "POLYMARKET_PRIVATE_KEY not set. Falling back to dry run."
             )
             self.dry_run = True
             return
 
         try:
-            self.client = PolymarketUS(
-                key_id=config.POLYMARKET_KEY_ID,
-                secret_key=config.POLYMARKET_SECRET_KEY,
+            self.client = ClobClient(
+                config.CLOB_HOST,
+                key=config.POLYMARKET_PRIVATE_KEY,
+                chain_id=config.CHAIN_ID,
+                signature_type=config.POLYMARKET_SIGNATURE_TYPE,
+                funder=config.POLYMARKET_FUNDER_ADDRESS or None,
             )
-            logger.info("Live trading client initialized successfully")
+            # Derive and set API credentials
+            api_creds = self.client.create_or_derive_api_creds()
+            self.client.set_api_creds(api_creds)
+            logger.info("Live trading client initialized successfully (Polymarket.com)")
         except Exception as e:
             logger.error(f"Failed to initialize live client: {e}. Falling back to dry run.")
             self.dry_run = True
@@ -102,7 +109,7 @@ class TradeExecutor:
         Execute a buy order.
 
         Args:
-            token_id: Market slug on Polymarket US
+            token_id: YES token_id for YES trades, NO token_id for NO trades
             amount_usd: Dollar amount to spend
             current_price: Current market price (for simulation / share calculation)
             direction: "YES" or "NO"
@@ -170,22 +177,21 @@ class TradeExecutor:
     async def _live_buy(
         self, token_id, amount, price, shares, direction, question,
     ) -> OrderResult:
-        """Place a market buy order on Polymarket US."""
+        """Place a market buy order on Polymarket.com CLOB."""
         try:
-            intent = "ORDER_INTENT_BUY_LONG" if direction == "YES" else "ORDER_INTENT_BUY_SHORT"
+            order_args = MarketOrderArgs(
+                token_id=token_id,
+                amount=amount,
+                side=BUY,
+            )
+            signed_order = await asyncio.to_thread(
+                self.client.create_market_order, order_args
+            )
             result = await asyncio.to_thread(
-                self.client.orders.create,
-                {
-                    "marketSlug": token_id,
-                    "intent": intent,
-                    "type": "ORDER_TYPE_MARKET",
-                    "cashOrderQty": {"value": f"{amount:.2f}", "currency": "USD"},
-                    "tif": "TIME_IN_FORCE_FILL_OR_KILL",
-                    "synchronousExecution": True,
-                },
+                self.client.post_order, signed_order, OrderType.FOK
             )
 
-            order_id = result.get("id", "unknown") if isinstance(result, dict) else "unknown"
+            order_id = result.get("orderID", result.get("id", "unknown")) if isinstance(result, dict) else "unknown"
             logger.info(
                 f"[LIVE] BUY {direction} | {question[:50]}... | "
                 f"${amount:.2f} | Order: {order_id}"
@@ -215,20 +221,22 @@ class TradeExecutor:
     async def _live_sell(
         self, token_id, shares, price, direction, question,
     ) -> OrderResult:
-        """Close a position on Polymarket US."""
+        """Close a position on Polymarket.com CLOB."""
         try:
-            intent = "ORDER_INTENT_SELL_LONG" if direction == "YES" else "ORDER_INTENT_SELL_SHORT"
+            amount = shares * price
+            order_args = MarketOrderArgs(
+                token_id=token_id,
+                amount=amount,
+                side=SELL,
+            )
+            signed_order = await asyncio.to_thread(
+                self.client.create_market_order, order_args
+            )
             result = await asyncio.to_thread(
-                self.client.orders.close_position,
-                {
-                    "marketSlug": token_id,
-                    "intent": intent,
-                    "synchronousExecution": True,
-                },
+                self.client.post_order, signed_order, OrderType.FOK
             )
 
-            amount = shares * price
-            order_id = result.get("id", "unknown") if isinstance(result, dict) else "unknown"
+            order_id = result.get("orderID", result.get("id", "unknown")) if isinstance(result, dict) else "unknown"
             logger.info(
                 f"[LIVE] SELL {direction} | {question[:50]}... | "
                 f"${amount:.2f} | Order: {order_id}"
@@ -255,12 +263,12 @@ class TradeExecutor:
                 error=str(e),
             )
 
-    def _log_failed_trade(self, action, market_slug, amount, direction, question, error):
+    def _log_failed_trade(self, action, token_id, amount, direction, question, error):
         """Append a failed trade attempt to failed_trades.json."""
         entry = {
             "timestamp": time.time(),
             "action": action,
-            "market_slug": market_slug,
+            "token_id": token_id,
             "amount_usd": amount,
             "direction": direction,
             "question": question,
@@ -270,7 +278,6 @@ class TradeExecutor:
         try:
             existing = json.loads(path.read_text()) if path.exists() else []
             existing.append(entry)
-            # Keep only last 50 failures
             path.write_text(json.dumps(existing[-50:], indent=2))
         except Exception:
             pass

@@ -295,10 +295,10 @@ class TradingSystem:
             sys.exit(1)
         
         if not config.DRY_RUN:
-            if not config.POLYMARKET_KEY_ID or not config.POLYMARKET_SECRET_KEY:
+            if not config.POLYMARKET_PRIVATE_KEY:
                 logger.error(
-                    "Live trading enabled but POLYMARKET_KEY_ID or POLYMARKET_SECRET_KEY not set. "
-                    "Set DRY_RUN=True or provide credentials from polymarket.us/developer."
+                    "Live trading enabled but POLYMARKET_PRIVATE_KEY not set. "
+                    "Set DRY_RUN=True or provide your wallet private key."
                 )
                 sys.exit(1)
             
