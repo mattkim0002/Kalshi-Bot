@@ -51,6 +51,7 @@ class TradeExecutor:
         self.dry_run = config.DRY_RUN
         self._session: Optional[aiohttp.ClientSession] = None
         self._headers: dict = {}
+        self._private_key = None  # set by _init_auth if credentials are valid
 
         if not self.dry_run:
             self._init_auth()
@@ -275,6 +276,8 @@ class TradeExecutor:
 
     async def get_balance(self) -> Optional[float]:
         """Fetch account balance from Kalshi in dollars."""
+        if self.dry_run or self._private_key is None:
+            return None
         await self._ensure_session()
         try:
             path = "/trade-api/v2/portfolio/balance"

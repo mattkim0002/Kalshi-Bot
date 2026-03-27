@@ -292,7 +292,7 @@ class TradingSystem:
         mode = "PAPER TRADING (DRY RUN)" if config.DRY_RUN else "⚠️  LIVE TRADING ⚠️"
         print(f"""
 ╔══════════════════════════════════════════════════════════════╗
-║           POLYMARKET AI TRADING SYSTEM                      ║
+║                      BOT TRADER                             ║
 ║                                                              ║
 ║  Mode:           {mode:<40} ║
 ║  Bankroll:       ${self.portfolio.bankroll:>10,.2f}                              ║

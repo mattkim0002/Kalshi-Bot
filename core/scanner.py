@@ -82,7 +82,7 @@ class MarketScanner:
         while len(markets) < limit:
             try:
                 params = {
-                    "status": "active",
+                    "status": "open",
                     "limit": 200,
                 }
                 if cursor:
