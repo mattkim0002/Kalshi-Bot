@@ -83,7 +83,7 @@ class MarketScanner:
         retries = 0
         max_retries = 4
         pages_fetched = 0
-        max_pages = 3  # Never fetch more than 3 pages (600 raw markets max)
+        max_pages = 8  # Fetch up to 8 pages to get past bulk sports markets
 
         while pages_fetched < max_pages:
             try:
@@ -156,16 +156,16 @@ class MarketScanner:
             if not ticker:
                 return None
 
-            # Prices come as cents (1-99), convert to 0-1
-            yes_ask = data.get("yes_ask", 0) or 0
-            yes_bid = data.get("yes_bid", 0) or 0
-            last_price = data.get("last_price", 0) or 0
+            # Prices returned as dollar strings e.g. "0.6500" (already 0-1 scale)
+            yes_ask = float(data.get("yes_ask_dollars", 0) or 0)
+            yes_bid = float(data.get("yes_bid_dollars", 0) or 0)
+            last_price = float(data.get("last_price_dollars", 0) or 0)
 
             # Use mid-price or last trade price
             if yes_ask > 0 and yes_bid > 0:
-                yes_price = (yes_ask + yes_bid) / 2 / 100
+                yes_price = (yes_ask + yes_bid) / 2
             elif last_price > 0:
-                yes_price = last_price / 100
+                yes_price = last_price
             else:
                 return None
 
@@ -175,9 +175,9 @@ class MarketScanner:
 
             no_price = 1 - yes_price
 
-            # Volume in cents → dollars
-            volume = float(data.get("volume_24h", 0) or 0) / 100
-            liquidity = float(data.get("open_interest", 0) or 0) / 100
+            # Volume and liquidity already in dollars (fp = fixed point string)
+            volume = float(data.get("volume_24h_fp", 0) or 0)
+            liquidity = float(data.get("open_interest_fp", 0) or 0)
 
             if volume < min_volume or liquidity < min_liquidity:
                 return None
@@ -190,7 +190,12 @@ class MarketScanner:
             if category.lower().strip() in config.EXCLUDED_CATEGORIES:
                 return None
             title_lower = title.lower()
-            if any(kw in title_lower for kw in config.EXCLUDED_KEYWORDS):
+            ticker_lower = ticker.lower()
+            if any(kw in title_lower or kw in ticker_lower for kw in config.EXCLUDED_KEYWORDS):
+                return None
+            # Block Kalshi Exchange sports tickers (KX prefix + sport codes)
+            sport_codes = ("nba", "nfl", "mlb", "nhl", "ncp", "mbb", "wbb", "cfb", "cbb", "nascar", "pga", "ufc")
+            if ticker_lower.startswith("kx") and any(s in ticker_lower for s in sport_codes):
                 return None
 
             return Market(
