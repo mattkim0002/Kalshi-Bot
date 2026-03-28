@@ -78,7 +78,7 @@ You MUST call the submit_prediction tool with your analysis."""
 
 
 class BtcContext:
-    """Fetches live Bitcoin price and trend from CoinGecko (no API key needed)."""
+    """Fetches Bitcoin historical data from CoinGecko (no API key needed)."""
 
     COINGECKO_URL = "https://api.coingecko.com/api/v3/coins/bitcoin/market_chart"
     _cache: dict = {}
@@ -86,13 +86,14 @@ class BtcContext:
 
     @classmethod
     async def get(cls, session: aiohttp.ClientSession) -> str:
-        """Return a short BTC market context string for Claude's prompt."""
+        """Return rich BTC historical context string for Claude's prompt."""
         now = time.time()
         if cls._cache and now - cls._cache.get("ts", 0) < cls._cache_ttl:
             return cls._cache["text"]
 
         try:
-            params = {"vs_currency": "usd", "days": "7", "interval": "daily"}
+            # Fetch 90 days of daily data
+            params = {"vs_currency": "usd", "days": "90", "interval": "daily"}
             async with session.get(
                 cls.COINGECKO_URL,
                 params=params,
@@ -102,22 +103,60 @@ class BtcContext:
                     return ""
                 data = await resp.json()
 
-            prices = [p[1] for p in data.get("prices", [])]
-            if len(prices) < 2:
+            prices  = [p[1] for p in data.get("prices", [])]
+            volumes = [v[1] for v in data.get("total_volumes", [])]
+
+            if len(prices) < 30:
                 return ""
 
-            current = prices[-1]
-            week_ago = prices[0]
-            pct_7d = (current - week_ago) / week_ago * 100
-            direction = "up" if pct_7d > 2 else "down" if pct_7d < -2 else "flat"
+            current   = prices[-1]
+            day7_ago  = prices[-7]  if len(prices) >= 7  else prices[0]
+            day30_ago = prices[-30] if len(prices) >= 30 else prices[0]
+            day90_ago = prices[0]
+
+            pct_7d  = (current - day7_ago)  / day7_ago  * 100
+            pct_30d = (current - day30_ago) / day30_ago * 100
+            pct_90d = (current - day90_ago) / day90_ago * 100
+
+            # Volatility: std dev of daily returns over last 30 days
+            import numpy as np
+            daily_returns = [(prices[i] - prices[i-1]) / prices[i-1] for i in range(-30, 0)]
+            volatility_30d = float(np.std(daily_returns)) * 100
+
+            # Support / resistance: 30-day low and high
+            recent = prices[-30:]
+            low_30d  = min(recent)
+            high_30d = max(recent)
+
+            # Average volume last 7 days
+            avg_vol_7d = sum(volumes[-7:]) / 7 if len(volumes) >= 7 else 0
+
+            # Trend label
+            if pct_7d > 5:
+                trend = "strong uptrend"
+            elif pct_7d > 2:
+                trend = "uptrend"
+            elif pct_7d < -5:
+                trend = "strong downtrend"
+            elif pct_7d < -2:
+                trend = "downtrend"
+            else:
+                trend = "sideways"
 
             text = (
-                f"MACRO CONTEXT — Bitcoin is currently ${current:,.0f} "
-                f"({pct_7d:+.1f}% over 7 days, trending {direction}). "
-                f"Factor this into your analysis where relevant."
+                f"BITCOIN MACRO CONTEXT:\n"
+                f"  Current price: ${current:,.0f}\n"
+                f"  7-day change:  {pct_7d:+.1f}% ({trend})\n"
+                f"  30-day change: {pct_30d:+.1f}%\n"
+                f"  90-day change: {pct_90d:+.1f}%\n"
+                f"  30-day range:  ${low_30d:,.0f} \u2013 ${high_30d:,.0f}\n"
+                f"  30-day volatility: {volatility_30d:.1f}% daily std\n"
+                f"  7-day avg volume: ${avg_vol_7d/1e9:.1f}B\n"
+                f"Factor this macro crypto sentiment into your analysis where relevant."
             )
+
             cls._cache = {"ts": now, "text": text}
-            logger.info(f"BTC context: {text}")
+            logger.info(f"BTC context: ${current:,.0f} | 7d:{pct_7d:+.1f}% | 30d:{pct_30d:+.1f}% | vol:{volatility_30d:.1f}%")
             return text
 
         except Exception as e:
@@ -162,7 +201,7 @@ class ProbabilityEstimator:
                     market.edge = market.estimated_prob - market.yes_price
                     
                     logger.info(
-                        f"Estimated {market.question[:60]}... → "
+                        f"Estimated {market.question[:60]}... \u2192 "
                         f"P={market.estimated_prob:.2f} "
                         f"(market={market.yes_price:.2f}, "
                         f"edge={market.edge:+.2f}, "
@@ -184,7 +223,7 @@ class ProbabilityEstimator:
         """
         Estimate probabilities for multiple markets concurrently.
         All markets are fired in parallel (bounded by semaphore) so total
-        time is ~1 Claude call instead of N × stagger_secs.
+        time is ~1 Claude call instead of N x stagger_secs.
         """
         logger.info(f"Estimating probabilities for {len(markets)} markets in parallel...")
 
